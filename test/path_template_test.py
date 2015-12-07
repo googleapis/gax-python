@@ -15,7 +15,7 @@
 """Unit tests for the path_template module."""
 
 import unittest2
-from path_template import PathTemplate, ValidationException
+from google.gax.path_template import PathTemplate, ValidationException
 
 
 class TestPathTemplate(unittest2.TestCase):
@@ -112,4 +112,3 @@ class TestPathTemplate(unittest2.TestCase):
     self.assertEqual(str(template), 'bar/**/foo/*')
     template = PathTemplate.from_string('buckets/*/objects/*:custom')
     self.assertEqual(str(template), 'buckets/*/objects/*:custom')
-
