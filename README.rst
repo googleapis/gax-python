@@ -9,7 +9,6 @@ Status
 * Initial checkin
 * Python open source project scaffolding
 
-
 Prerequisite
 ------------
 
@@ -19,8 +18,48 @@ Prerequisite
 Installation
 -------------
 
-* At the moment, it is unpublished and needs to be installed from source
-  following checkout from its git repo.  See developing below.
+(optional) Remove any previous installation:
+
+  ::
+
+     brew uninstall grpc  # Will fail if brew not installed
+     rm -rf ~/.linuxbrew
+     sudo rm -fR /usr/local/include/grpc*
+     sudo rm -fR /usr/local/lib/libgrpc*
+     sudo rm -fR /usr/local/lib/libgpr*
+     rm -fR /usr/local/lib/pkgconfig/grpc*.pc
+     rm -fv /usr/local/lib/pkgconfig/gpr*.pc
+
+Install linuxbrew:
+
+  ::
+
+     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/linuxbrew/go/install)"
+     export PATH=~/.linuxbrew/bin:${PATH}  # also modify your ~/.bashrc accordingly
+     brew doctor
+
+Install gRPC:
+
+  ::
+
+     curl -fsSL https://goo.gl/getgrpc | bash -
+     curl -fsSL https://goo.gl/getgrpc | bash -s plugins
+
+Install tox:
+
+  ::
+
+     sudo pip install tox  # done once, installed globally
+
+Clone the repository (in this example, into ~/repos):
+
+  ::
+
+     mkdir ~/repos; cd ~/repos
+     git clone sso://gapi/gcloud-python-gax
+     cd gcloud-python-gax
+     CFLAGS=-I$(brew --prefix)/include LDFLAGS=-L$(brew --prefix)/lib tox -e py27
+     tox -e py27
 
 
 Developing
@@ -30,28 +69,26 @@ Use tox
 
   ::
 
-       $ sudo pip install tox  # done once, installed globally
-       $
+       $ cd ~/repos/gcloud-python-gax  # or wherever your repo is
+
        $ # Run the tests and linter (the default tox command)
        $ tox
-       $
+
        $ # Run the pep8 linter
-       $
        $ tox -e pep8
-       $
-       $ ...
-       $ # To run scripts, activate the development:
+
+
+       $ # To run scripts, activate the development environment:
        $
        $ # Create a development virtualenv
        $ #
-       $ # Set up a virtualenv at .tox/develop that contains the nurpc-hyper.protocol package
+       $ # Set up a virtualenv at .tox/develop that contains the gcloud-python-gax package
        $ # with installed using python setup.py --develop.
-       $
-       $ tox -e devenv
-       $
+       $ CFLAGS=-I$(brew --prefix)/include LDFLAGS=-L$(brew --prefix)/lib tox -e devenv
+
        $ # This puts the console scripts on the path
-       $ . .tox/develop/activate
-       $
+       $ . .tox/develop/bin/activate
+
        $(develop) # Later deactivate it
        $(develop) deactivate
 
