@@ -187,7 +187,7 @@ class ApiCallable(object):
         self.is_retrying = is_retrying
         self.page_descriptor = page_streaming
         if max_attempts is None:
-            self.max_attempts = defaults.max_attempts
+            self.max_attempts = None if defaults is None else defaults.max_attempts
         else:
             self.max_attempts = max_attempts
         self.timeout = defaults.timeout if timeout is None else timeout

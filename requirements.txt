@@ -1,2 +1,3 @@
 grpcio==0.11.0b1
+protobuf==3.0.0a3
 oauth2client>=1.5.2
