@@ -11,14 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Configuration-derived settings for page-streaming"""
-
-from __future__ import absolute_import
-import collections
-
-
-PageDescriptor = collections.namedtuple(
-    'PageDescriptor',
-    ['request_page_token_field', 'response_page_token_field', 'resource_field'])
-"""Describes the structure of a page-streaming call"""
