@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
 """Unit tests for api_callable"""
 
 from __future__ import absolute_import
@@ -64,6 +65,7 @@ class TestApiCallable(unittest2.TestCase):
         page_size = 3
         pages_to_stream = 5
 
+        # pylint: disable=abstract-method
         class PageStreamingRequest(message.Message):
             def __init__(self, page_token=0):
                 self.page_token = page_token
@@ -76,17 +78,17 @@ class TestApiCallable(unittest2.TestCase):
         mock_grpc_func_descriptor = page_descriptor.PageDescriptor(
             'page_token', 'next_page_token', 'nums')
 
-        def grpc_return_value(request, *args, **kwargs):
+        def grpc_return_value(request, *dummy_args, **dummy_kwargs):
             if (request.page_token > 0 and
                     request.page_token < page_size * pages_to_stream):
                 return PageStreamingResponse(
-                    nums=range(request.page_token,
-                               request.page_token + page_size),
+                    nums=iter(range(request.page_token,
+                                    request.page_token + page_size)),
                     next_page_token=request.page_token + page_size)
             elif request.page_token >= page_size * pages_to_stream:
                 return PageStreamingResponse()
             else:
-                return PageStreamingResponse(nums=range(page_size),
+                return PageStreamingResponse(nums=iter(range(page_size)),
                                              next_page_token=page_size)
 
         with mock.patch('grpc.framework.crust.implementations.'
@@ -95,7 +97,7 @@ class TestApiCallable(unittest2.TestCase):
             my_callable = api_callable.ApiCallable(
                 mock_grpc, timeout=0, page_streaming=mock_grpc_func_descriptor)
             self.assertEqual(list(my_callable(PageStreamingRequest())),
-                             range(page_size * pages_to_stream))
+                             list(range(page_size * pages_to_stream)))
 
     def test_defaults_override_apicallable_defaults(self):
         defaults = api_callable.ApiCallableDefaults(timeout=10, max_attempts=6)

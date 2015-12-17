@@ -96,6 +96,7 @@ def _page_streamable(call, request_page_token_field, response_page_token_field,
 
 class ApiCallableDefaults(object):
     """Encapsulates the default settings for ApiCallable."""
+    # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
                  max_attempts=16):
         """Constructor.
@@ -156,6 +157,7 @@ class ApiCallable(object):
 
     Calling an object of ApiCallable type causes these calls to be transmitted.
     """
+    # pylint: disable=too-few-public-methods
     def __init__(self, func, timeout=None, is_retrying=False,
                  page_streaming=None, max_attempts=None, defaults=None):
         """Constructor.

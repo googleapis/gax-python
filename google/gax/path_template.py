@@ -22,12 +22,22 @@ import urllib
 CUSTOM_VERB_PATTERN = re.compile(':([^/*}{=]+)$')
 
 
+def _encode_url(text):
+    return urllib.quote(text.encode('utf8'), safe='')
+
+
+def _decode_url(url):
+    return urllib.unquote(url)
+
+
 class ValidationException(Exception):
+    """Indicates errors in path template parsing."""
     pass
 
 
 class SegmentKind(object):
     """Enumerates possible Segment types."""
+    # pylint: disable=too-few-public-methods
     LITERAL = 1
     CUSTOM_VERB = 2
     WILDCARD = 3
@@ -38,6 +48,7 @@ class SegmentKind(object):
 
 class Segment(object):
     """Defines a single path template segment."""
+    # pylint: disable=too-few-public-methods
     kind = None
     value = None
     separator = None
@@ -69,6 +80,7 @@ def _parse_template(template):
     Raises:
         ValidationException: If there is a parsing error.
     """
+    # pylint: disable=too-many-branches,too-many-statements
     if template.startswith('/'):
         template = template[1:]
     custom_verb = None
@@ -81,7 +93,7 @@ def _parse_template(template):
     free_wildcard_counter = 0
     path_wildcard_bound = 0
 
-    for seg in map(str.strip, template.split('/')):
+    for seg in [x.strip() for x in template.split('/')]:
         binding_starts = seg.startswith('{')
         implicit_wildcard = False
         if binding_starts:
@@ -222,12 +234,6 @@ class PathTemplate(object):
                 continue
         return result
 
-    def _encode_url(self, text):
-        return urllib.quote(text.encode('utf8'), safe='')
-
-    def _decode_url(self, url):
-        return urllib.unquote(url)
-
     def match(self, path):
         """Returns a dict of variable names to matched values.
 
@@ -262,7 +268,7 @@ class PathTemplate(object):
         if last.kind == SegmentKind.CUSTOM_VERB:
             match_obj = CUSTOM_VERB_PATTERN.search(path)
             if not match_obj or (
-                    self._decode_url(match_obj.group(1)) != last.value):
+                    _decode_url(match_obj.group(1)) != last.value):
                 return None
             path = path[0:match_obj.start(0)]
 
@@ -270,7 +276,7 @@ class PathTemplate(object):
         with_host_name = path.startswith('//')
         if with_host_name:
             path = path[2:]
-        inp = map(str.strip, path.split('/'))
+        inp = [x.strip() for x in path.split('/')]
         in_pos = 0
         values = {}
         if with_host_name or force_host_name:
@@ -287,6 +293,7 @@ class PathTemplate(object):
 
     def _match_segments(self, inp, in_pos, seg_pos, values):
         """Returns whether the segments match the input."""
+        # pylint: disable=too-many-branches
         current_var = None
         while seg_pos < len(self.segments):
             seg = self.segments[seg_pos]
@@ -302,7 +309,7 @@ class PathTemplate(object):
             else:
                 if in_pos >= len(inp):
                     return False
-                next_val = self._decode_url(inp[in_pos])
+                next_val = _decode_url(inp[in_pos])
                 in_pos += 1
                 if seg.kind == SegmentKind.LITERAL:
                     if seg.value != next_val:
@@ -325,7 +332,7 @@ class PathTemplate(object):
                     available = len(inp) - in_pos - segs_to_match
                     while available > 0:
                         values[current_var] += '/'
-                        values[current_var] += self._decode_url(inp[in_pos])
+                        values[current_var] += _decode_url(inp[in_pos])
                         in_pos += 1
                         available -= 1
         return in_pos == len(inp)
@@ -371,6 +378,7 @@ class PathTemplate(object):
 
     def _instantiate(self, values, allow_partial):
         """Instantiates the template based on the given variable assignment."""
+        # pylint: disable=too-many-branches,too-many-locals
         result = ''
         if self.HOSTNAME_VAR in values:
             result += values[self.HOSTNAME_VAR] + '/'
@@ -406,14 +414,14 @@ class PathTemplate(object):
                 path_escape = next_segment.kind == SegmentKind.PATH_WILDCARD
                 path_escape |= next_next_segment.kind != SegmentKind.END_BINDING
                 if not path_escape:
-                    result += self._encode_url(value)
+                    result += _encode_url(value)
                 else:
                     first = True
-                    for sub_seg in map(str.strip, value.split('/')):
+                    for sub_seg in [x.strip() for x in value.split('/')]:
                         if not first:
                             result += '/'
                         first = False
-                        result += self._encode_url(sub_seg)
+                        result += _encode_url(sub_seg)
                 skip = True
                 continue
             elif seg.kind == SegmentKind.END_BINDING:

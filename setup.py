@@ -52,8 +52,9 @@ with open('google/gax/__init__.py', 'r') as f:
 
 
 install_requires = [
-    'oauth2client>=1.5.2',
     'grpcio==0.11.0b1',
+    'oauth2client>=1.5.2',
+    'protobuf>=3.0.0b1.post1'
 ]
 
 setup(

@@ -11,13 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-import pkgutil
-import pkg_resources
-# This is a namespace package.
-try:
-    pkg_resources.declare_namespace(__name__)
-except ImportError:
-    __path__ = pkgutil.extend_path(__path__, __name__)
+#
+# pylint: disable=missing-docstring
+__import__('pkg_resources').declare_namespace(__name__)
