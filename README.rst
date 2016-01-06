@@ -93,7 +93,7 @@ Use tox
        $(develop) deactivate
 
 .. _`Install virtualenv`: http://docs.python-guide.org/en/latest/dev/virtualenvs/
-.. _pip: https://pip.pypa.io
+.. _`pip`: https://pip.pypa.io
 .. _`gRPC protocol`: https://github.com/grpc/grpc-common/blob/master/PROTOCOL-HTTP2.md
 .. _`edit RST online`: http://rst.ninjs.org
 .. _`RST cheatsheet`: http://docutils.sourceforge.net/docs/user/rst/cheatsheet.txt

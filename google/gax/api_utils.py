@@ -1,10 +1,10 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,12 +25,12 @@ def _oauth_access_token(scopes):
     return scoped_creds.get_access_token().access_token
 
 
-def create_stub(
-        generated_create_stub, service_path, port, ssl_creds=None, channel=None,
-        metadata_transformer=None, scopes=None):
+def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
+                channel=None, metadata_transformer=None, scopes=None):
     """Creates a gRPC client stub.
 
     Args:
+        generated_create_stub: The generated gRPC method to create a stub.
         service_path: The DNS of the API remote host.
         port: The port on which to connect to the remote host.
         ssl_creds: A ClientCredentials object for use with an SSL-enabled
@@ -41,7 +41,6 @@ def create_stub(
             requests, e.g., to give OAuth credentials.
         scopes: The OAuth scopes for this service. This parameter is ignored if
             a custom metadata_transformer is supplied.
-        generated_create_stub: The generated gRPC method to create a stub.
 
     Returns:
         A gRPC client stub.
