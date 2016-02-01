@@ -31,13 +31,7 @@
 
 from __future__ import absolute_import
 from grpc.beta import implementations
-from oauth2client import client as auth_client
-
-
-def _oauth_access_token(scopes):
-    google_creds = auth_client.GoogleCredentials.get_application_default()
-    scoped_creds = google_creds.create_scoped(scopes)
-    return scoped_creds.get_access_token().access_token
+from . import auth
 
 
 def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
@@ -72,10 +66,7 @@ def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
         channel = channel
 
     if metadata_transformer is None:
-        metadata_transformer = lambda x: [
-            ('Authorization', 'Bearer %s' % _oauth_access_token(scopes))]
-    else:
-        metadata_transformer = metadata_transformer
+        metadata_transformer = auth.make_auth_func(scopes)
 
     return generated_create_stub(channel,
                                  metadata_transformer=metadata_transformer)
