@@ -29,4 +29,18 @@
 
 """Google API Extensions"""
 
+from __future__ import absolute_import
+import collections
+
+
 __version__ = '0.1.0'
+
+
+class PageDescriptor(
+        collections.namedtuple(
+            'PageDescriptor',
+            ['request_page_token_field',
+             'response_page_token_field',
+             'resource_field'])):
+    """Describes the structure of a page-streaming call"""
+    pass
