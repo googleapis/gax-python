@@ -32,6 +32,7 @@
 from __future__ import absolute_import
 
 from grpc.framework.interfaces.face import face
+from . import grpc
 
 # This defaults to checking for grpc AbortionErrors.
 #
@@ -40,3 +41,6 @@ from grpc.framework.interfaces.face import face
 
 RETRY_EXCEPTIONS = (face.AbortionError,)
 """Exceptions that will trigger a retry."""
+
+create_stub = grpc.create_stub  # pylint: disable=invalid-name
+"""The function to use to create stubs."""
