@@ -38,12 +38,14 @@ from google.gax import api_callable, page_descriptor
 from google.protobuf import message
 from grpc.framework.interfaces.face import face
 
+_DUMMY_ERROR = face.AbortionError(None, None, None, None)
+
 
 class TestApiCallable(unittest2.TestCase):
 
     def test_call_api_callable(self):
-        mock_grpc_func = lambda request, timeout: 42
-        my_callable = api_callable.ApiCallable(mock_grpc_func, timeout=0)
+        my_callable = api_callable.ApiCallable(lambda _req, _timeout: 42,
+                                               timeout=0)
         self.assertEqual(my_callable(None), 42)
 
     def test_retry(self):
@@ -51,9 +53,8 @@ class TestApiCallable(unittest2.TestCase):
         # Succeeds on the to_attempt'th call, and never again afterward
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = (
-                [face.AbortionError(None, None, None, None)] * (to_attempt - 1)
-                + [mock.DEFAULT])
+            mock_grpc.side_effect = ([_DUMMY_ERROR] * (to_attempt - 1) +
+                                     [mock.DEFAULT])
             mock_grpc.return_value = 1729
             my_callable = api_callable.ApiCallable(
                 mock_grpc, timeout=0, is_retrying=True,
@@ -65,7 +66,7 @@ class TestApiCallable(unittest2.TestCase):
         to_attempt = 3
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = face.AbortionError(None, None, None, None)
+            mock_grpc.side_effect = _DUMMY_ERROR
             my_callable = api_callable.ApiCallable(
                 mock_grpc, timeout=0, is_retrying=True,
                 max_attempts=to_attempt)
