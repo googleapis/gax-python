@@ -59,12 +59,7 @@ def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
     if channel is None:
         if ssl_creds is None:
             ssl_creds = implementations.ssl_client_credentials(None, None, None)
-        else:
-            ssl_creds = ssl_creds
         channel = implementations.secure_channel(service_path, port, ssl_creds)
-    else:
-        channel = channel
-
     if metadata_transformer is None:
         metadata_transformer = auth.make_auth_func(scopes)
 
