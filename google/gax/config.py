@@ -27,20 +27,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Google API Extensions"""
+"""Runtime configuration shared by gax modules."""
 
 from __future__ import absolute_import
-import collections
 
+from grpc.framework.interfaces.face import face
+from . import grpc
 
-__version__ = '0.1.0'
+# This defaults to checking for grpc AbortionErrors.
+#
+# TODO Determine which (if not all) we want to catch.
+# If necessary, ask Python gRPC to distinguish exception classes.
 
+RETRY_EXCEPTIONS = (face.AbortionError,)
+"""Exceptions that will trigger a retry."""
 
-class PageDescriptor(
-        collections.namedtuple(
-            'PageDescriptor',
-            ['request_page_token_field',
-             'response_page_token_field',
-             'resource_field'])):
-    """Describes the structure of a page-streaming call"""
-    pass
+create_stub = grpc.create_stub  # pylint: disable=invalid-name
+"""The function to use to create stubs."""

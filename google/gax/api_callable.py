@@ -27,19 +27,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Implements page streaming and retrying. Should eventually be part of GAX."""
+"""Provides function wrappers that implement page streaming and retrying."""
 
 from __future__ import absolute_import
-from grpc.framework.interfaces.face import face
+from . import config
 
 
-# TODO: Check which AbortionErrors (if not all) we want to catch.
-# If necessary, ask Python gRPC to distinguish exception classes.
 def _retrying(max_attempts, call, args, kwargs):
     """Attempts to call a function up to max_attempt times."""
     try:
         return call(*args, **kwargs)
-    except face.AbortionError:
+    except config.RETRY_EXCEPTIONS:
         if max_attempts <= 1:
             raise
         else:

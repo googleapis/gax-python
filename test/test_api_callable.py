@@ -34,7 +34,7 @@ from __future__ import absolute_import
 import mock
 import unittest2
 
-from google.gax import api_callable, page_descriptor
+from google.gax import api_callable, PageDescriptor
 from google.protobuf import message
 from grpc.framework.interfaces.face import face
 
@@ -91,7 +91,7 @@ class TestApiCallable(unittest2.TestCase):
                 self.nums = nums
                 self.next_page_token = next_page_token
 
-        mock_grpc_func_descriptor = page_descriptor.PageDescriptor(
+        mock_grpc_func_descriptor = PageDescriptor(
             'page_token', 'next_page_token', 'nums')
 
         def grpc_return_value(request, *dummy_args, **dummy_kwargs):

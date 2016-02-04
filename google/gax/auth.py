@@ -27,13 +27,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Configuration-derived settings for page-streaming"""
+"""Provides the authorization callback used in Veneer Toolkit libraries."""
 
 from __future__ import absolute_import
-import collections
+
+from oauth2client import client as auth_client
 
 
-PageDescriptor = collections.namedtuple(
-    'PageDescriptor',
-    ['request_page_token_field', 'response_page_token_field', 'resource_field'])
-"""Describes the structure of a page-streaming call"""
+def make_auth_func(scopes):
+    """Creates the callback that provides per rpc auth creds."""
+    google_creds = auth_client.GoogleCredentials.get_application_default()
+    scoped_creds = google_creds.create_scoped(scopes)
+
+    def auth_func(dummy_headers):
+        """Adds the access token from the creds as the authorization token."""
+        authn = scoped_creds.get_access_token().access_token
+        return [
+            ('authorization', 'Bearer %s' % (authn,))
+        ]
+
+    return auth_func
