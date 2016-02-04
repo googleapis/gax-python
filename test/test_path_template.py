@@ -43,6 +43,12 @@ class TestPathTemplate(unittest2.TestCase):
         template = PathTemplate.from_string('buckets/*/*/objects/*')
         self.assertEqual({'$0': 'f', '$1': 'o', '$2': 'bar'},
                          template.match('buckets/f/o/objects/bar'))
+        template = PathTemplate.from_string('/buckets/{hello}')
+        self.assertEqual({'hello': 'world'},
+                         template.match('buckets/world'))
+        template = PathTemplate.from_string('/buckets/{hello=*}')
+        self.assertEqual({'hello': 'world'},
+                         template.match('buckets/world'))
 
     def test_match_template_with_unbounded_wildcard(self):
         template = PathTemplate.from_string('buckets/*/objects/**')
@@ -131,3 +137,7 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual(str(template), 'bar/**/foo/*')
         template = PathTemplate.from_string('buckets/*/objects/*:custom')
         self.assertEqual(str(template), 'buckets/*/objects/*:custom')
+        template = PathTemplate.from_string('/buckets/{hello}')
+        self.assertEqual(str(template), 'buckets/{hello}')
+        template = PathTemplate.from_string('/buckets/{hello=what}/{world}')
+        self.assertEqual(str(template), 'buckets/{hello=what}/{world}')
