@@ -27,5 +27,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# pylint: disable=missing-docstring
-__import__('pkg_resources').declare_namespace(__name__)  # pragma: no cover
+# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
+"""Unit tests for auth"""
+
+from __future__ import absolute_import
+
+import mock
+import unittest2
+
+from google.gax import auth
+
+
+class TestMakeAuthFunc(unittest2.TestCase):
+    TEST_TOKEN = 'an_auth_token'
+
+    @mock.patch('oauth2client.client.GoogleCredentials.get_application_default')
+    def test_uses_application_default_credentials(self, factory):
+        creds = mock.Mock()
+        creds.get_access_token.return_value = mock.Mock(
+            access_token=self.TEST_TOKEN)
+        factory_mock_config = {'create_scoped.return_value': creds}
+        factory.return_value = mock.Mock(**factory_mock_config)
+        fake_scopes = ['fake', 'scopes']
+        the_func = auth.make_auth_func(fake_scopes)
+        factory.return_value.create_scoped.assert_called_once_with(fake_scopes)
+        got = the_func({})
+        want = [('authorization', 'Bearer an_auth_token')]
+        self.assertEqual(got, want)
