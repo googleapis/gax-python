@@ -1,22 +1,15 @@
-google-gax
-==========
+Google API eXtensions
+=====================
 
-google-gax is the Google API extension library.
+Google API eXtensions (GAX) is a support library for use with the python client
+libraries generated from the published protobuf IDL, e.g, the published `Google
+APIs`_.
 
-Status
-------
-
-* Initial checkin
-* Python open source project scaffolding
 
 Prerequisite
 ------------
 
-* grpcio needs to be installed
-
-
-Installation
--------------
+* Prior to grpc 0.11.0, the c-grpc runtime needs to be installed.
 
 (optional) Remove any previous installation:
 
@@ -45,6 +38,11 @@ Install gRPC:
      curl -fsSL https://goo.gl/getgrpc | bash -
      curl -fsSL https://goo.gl/getgrpc | bash -s plugins
 
+
+Installation
+-------------
+
+
 Install tox:
 
   ::
@@ -56,7 +54,7 @@ Clone the repository (in this example, into ~/repos):
   ::
 
      mkdir ~/repos; cd ~/repos
-     git clone sso://gapi/gcloud-python-gax
+     git clone git@github.com:googleapis/gax-python.git
      cd gcloud-python-gax
      CFLAGS=-I$(brew --prefix)/include LDFLAGS=-L$(brew --prefix)/lib tox -e py27
      tox -e py27
@@ -101,3 +99,4 @@ Use tox
 .. _`Tox-driven python development`: http://www.boronine.com/2012/11/15/Tox-Driven-Python-Development/
 .. _`Sphinx documentation example`: http://sphinx-doc.org/latest/ext/example_google.html
 .. _`hyper`: https://github.com/lukasa/hyper
+.. _`Google APIs`: https://github.com/google/googleapis/

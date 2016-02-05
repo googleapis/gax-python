@@ -375,7 +375,7 @@ class PathTemplate(object):
     def instantiate_partial(self, values):
         """Instantiate the template based on the given variable assignment.
 
-        Similar to instantiate(*args), but allows for unbound variables, which
+        Similar to instantiate, but allows for unbound variables, which
         are substituted with their original syntax.
 
         Args:
@@ -383,7 +383,7 @@ class PathTemplate(object):
 
         Returns:
             (str) An instantiated path template string. Can be used to create a
-                new template.
+            new template.
 
         Raises:
             ValidationException: If there is a parsing error.
