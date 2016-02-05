@@ -28,7 +28,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
-"""Unit tests for api_callable"""
+"""Unit tests for grpc."""
 
 from __future__ import absolute_import
 

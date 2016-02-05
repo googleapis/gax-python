@@ -28,7 +28,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
-"""Unit tests for auth"""
+"""Unit tests for auth."""
 
 from __future__ import absolute_import
 

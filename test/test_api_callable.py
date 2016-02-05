@@ -35,7 +35,6 @@ import mock
 import unittest2
 
 from google.gax import api_callable, PageDescriptor
-from google.protobuf import message
 from grpc.framework.interfaces.face import face
 
 _DUMMY_ERROR = face.AbortionError(None, None, None, None)
@@ -81,12 +80,12 @@ class TestApiCallable(unittest2.TestCase):
         page_size = 3
         pages_to_stream = 5
 
-        # pylint: disable=abstract-method
-        class PageStreamingRequest(message.Message):
+        # pylint: disable=abstract-method, too-few-public-methods
+        class PageStreamingRequest(object):
             def __init__(self, page_token=0):
                 self.page_token = page_token
 
-        class PageStreamingResponse(message.Message):
+        class PageStreamingResponse(object):
             def __init__(self, nums=(), next_page_token=0):
                 self.nums = nums
                 self.next_page_token = next_page_token

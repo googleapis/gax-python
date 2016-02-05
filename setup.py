@@ -33,9 +33,11 @@ import os
 import re
 import sys
 from setuptools import setup, find_packages
+
 if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit()
+
 # Get the version
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
 with open('google/gax/__init__.py', 'r') as f:
@@ -45,11 +47,12 @@ with open('google/gax/__init__.py', 'r') as f:
         version = match.group(1)
     else:
         raise RuntimeError("No version number found!")
+
 install_requires = [
     'grpcio==0.11.0b1',
     'oauth2client>=1.5.2',
-    'protobuf>=3.0.0b1.post1'
 ]
+
 setup(
     name='google-gax',
     version=version,
@@ -63,7 +66,7 @@ setup(
     package_dir={'google-gax': 'google'},
     license='BSD-3-Clause',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 3 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
