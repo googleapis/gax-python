@@ -1,9 +1,14 @@
-Google API eXtensions
-=====================
+Google API Extensions for Python
+================================
 
-Google API eXtensions (GAX) is a support library for use with the python client
-libraries generated from the published protobuf IDL, e.g, the published `Google
-APIs`_.
+Google API Extensions for Python (gax-python) is a set of libraries which 
+aids the development of APIs for clients and servers based on `GRPC`_ and 
+Google API conventions.
+
+Application code will rarely need to use most of the classes within this
+library directly, but code generated automatically from the API definition
+files can use services such as page streaming and request bundling to provide
+a more convenient and idiomatic API surface to callers.
 
 
 Prerequisite
@@ -90,6 +95,45 @@ Use tox
        $(develop) # Later deactivate it
        $(develop) deactivate
 
+
+Python Versions
+---------------
+
+gax-python is currently tested with Python 2.7.
+
+
+Contributing
+------------
+
+Contributions to this library are always welcome and highly encouraged.
+
+See the `CONTRIBUTING`_ documentation for more information on how to get started.
+
+
+Versioning
+----------
+
+This library follows `Semantic Versioning`_ 
+
+It is currently in major version zero (``0.y.z``), which means that anything
+may change at any time and the public API should not be considered
+stable.
+
+
+Details
+-------
+
+For detailed documentation of the modules in gax-python, please watch `DOCUMENTATION`_. 
+
+
+License
+-------
+
+BSD - See `LICENSE`_ for more information.
+
+.. _`CONTRIBUTING`: https://github.com/googleapis/gax-python/blob/master/CONTRIBUTING.rst
+.. _`LICENSE`: https://github.com/googleapis/gax-python/blob/master/LICENSE
+.. _`GRPC`: http://grpc.io
 .. _`Install virtualenv`: http://docs.python-guide.org/en/latest/dev/virtualenvs/
 .. _`pip`: https://pip.pypa.io
 .. _`gRPC protocol`: https://github.com/grpc/grpc-common/blob/master/PROTOCOL-HTTP2.md
@@ -100,3 +144,5 @@ Use tox
 .. _`Sphinx documentation example`: http://sphinx-doc.org/latest/ext/example_google.html
 .. _`hyper`: https://github.com/lukasa/hyper
 .. _`Google APIs`: https://github.com/google/googleapis/
+.. _`Semantic Versioning`: http://semver.org/
+.. _`DOCUMENTATION`: https://gax-python.readthedocs.org/
