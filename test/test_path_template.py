@@ -39,105 +39,84 @@ from google.gax.path_template import PathTemplate, ValidationException
 class TestPathTemplate(unittest2.TestCase):
     """Unit tests for PathTemplate."""
 
+    def test_len(self):
+        self.assertEqual(len(PathTemplate('a/b/**/*/{a=hello/world}')), 6)
+
+    def test_fail_when_impossible_match(self):
+        template = PathTemplate('hello/world')
+        self.assertRaises(ValidationException,
+                          template.match, 'hello')
+
+    def test_fail_mismatched_literal(self):
+        template = PathTemplate('hello/world')
+        self.assertRaises(ValidationException,
+                          template.match, 'hello/world2')
+
+    def test_fail_when_multiple_path_wildcards(self):
+        self.assertRaises(ValidationException,
+                          PathTemplate, 'buckets/*/**/**/objects/*')
+
+    def test_fail_if_inner_binding(self):
+        self.assertRaises(ValidationException,
+                          PathTemplate, 'buckets/{hello={world}}')
+
+    def test_fail_illegal_char(self):
+        self.assertRaises(ValidationException,
+                          PathTemplate, 'a/b?')
+
+    def test_fail_unexpected_eof(self):
+        self.assertRaises(ValidationException,
+                          PathTemplate, 'a/{hello=world')
+
     def test_match_atomic_resource_name(self):
-        template = PathTemplate.from_string('buckets/*/*/objects/*')
+        template = PathTemplate('buckets/*/*/objects/*')
         self.assertEqual({'$0': 'f', '$1': 'o', '$2': 'bar'},
                          template.match('buckets/f/o/objects/bar'))
-        template = PathTemplate.from_string('/buckets/{hello}')
+        template = PathTemplate('/buckets/{hello}')
         self.assertEqual({'hello': 'world'},
                          template.match('buckets/world'))
-        template = PathTemplate.from_string('/buckets/{hello=*}')
+        template = PathTemplate('/buckets/{hello=*}')
         self.assertEqual({'hello': 'world'},
                          template.match('buckets/world'))
 
     def test_match_template_with_unbounded_wildcard(self):
-        template = PathTemplate.from_string('buckets/*/objects/**')
+        template = PathTemplate('buckets/*/objects/**')
         self.assertEqual({'$0': 'foo', '$1': 'bar/baz'},
                          template.match('buckets/foo/objects/bar/baz'))
 
-    def test_match_with_forced_host_name(self):
-        template = PathTemplate.from_string('buckets/*/objects/*')
-        match = template.match_from_full_name(
-            'somewhere.io/buckets/b/objects/o')
-        self.assertNotEqual(None, match)
-        self.assertEqual('somewhere.io', match[PathTemplate.HOSTNAME_VAR])
-        self.assertEqual('b', match['$0'])
-        self.assertEqual('o', match['$1'])
-
-    def test_match_with_host_name(self):
-        template = PathTemplate.from_string('buckets/*/objects/*')
-        match = template.match('//somewhere.io/buckets/b/objects/o')
-        self.assertNotEqual(None, match)
-        self.assertEqual('//somewhere.io', match[PathTemplate.HOSTNAME_VAR])
-        self.assertEqual('b', match['$0'])
-        self.assertEqual('o', match['$1'])
-
     def test_match_with_custom_method(self):
-        template = PathTemplate.from_string('buckets/*/objects/*:custom')
-        match = template.match('buckets/b/objects/o:custom')
-        self.assertNotEqual(None, match)
-        self.assertEqual('b', match['$0'])
-        self.assertEqual('o', match['$1'])
-
-    def test_match_fail_when_path_mismatch(self):
-        template = PathTemplate.from_string('buckets/*/*/objects/*')
-        self.assertEqual(None, template.match('buckets/f/o/o/objects/bar'))
-
-    def test_match_fail_when_path_too_short(self):
-        template = PathTemplate.from_string('buckets/*/*/objects/*')
-        self.assertEqual(None, template.match('buckets/f/o/objects'))
-
-    def test_match_fail_when_path_too_long(self):
-        template = PathTemplate.from_string('buckets/*/*/objects/*')
-        self.assertEqual(None, template.match('buckets/f/o/objects/too/long'))
+        template = PathTemplate('buckets/*/objects/*:custom')
+        self.assertEqual({'$0': 'b', '$1': 'o'},
+                         template.match('buckets/b/objects/o:custom'))
 
     def test_match_with_unbound_in_middle(self):
-        template = PathTemplate.from_string('bar/**/foo/*')
+        template = PathTemplate('bar/**/foo/*')
         self.assertEqual({'$0': 'foo/foo', '$1': 'bar'},
                          template.match('bar/foo/foo/foo/bar'))
 
     def test_instantiate_atomic_resource(self):
-        template = PathTemplate.from_string('buckets/*/*/*/objects/*')
-        url = template.instantiate('$0', 'f', '$1', 'o', '$2', 'o', '$3', 'bar')
+        template = PathTemplate('buckets/*/*/*/objects/*')
+        url = template.instantiate(
+            {'$0': 'f', '$1': 'o', '$2': 'o', '$3': 'bar'})
         self.assertEqual(url, 'buckets/f/o/o/objects/bar')
 
-    def test_instantiate_escape_unsafe_char(self):
-        template = PathTemplate.from_string('buckets/*/objects/*')
-        url = template.instantiate('$0', 'f/o/o', '$1', 'b/a/r')
-        self.assertEqual(url, 'buckets/f%2Fo%2Fo/objects/b%2Fa%2Fr')
-
-    def test_instantiate_not_escape_for_unbounded_wildcard(self):
-        template = PathTemplate.from_string('buckets/*/objects/**')
-        url = template.instantiate('$0', 'f/o/o', '$1', 'b/a/r')
-        self.assertEqual(url, 'buckets/f%2Fo%2Fo/objects/b/a/r')
-
     def test_instantiate_fail_when_too_few_variables(self):
-        template = PathTemplate.from_string('buckets/*/*/*/objects/*')
+        template = PathTemplate('buckets/*/*/*/objects/*')
         self.assertRaises(ValidationException,
-                          template.instantiate, '$0', 'f', 'l', 'o')
+                          template.instantiate,
+                          {'$0': 'f', '$1': 'l', '$2': 'o'})
 
     def test_instantiate_with_unbound_in_middle(self):
-        template = PathTemplate.from_string('bar/**/foo/*')
-        url = template.instantiate('$0', '1/2', '$1', '3')
+        template = PathTemplate('bar/**/foo/*')
+        url = template.instantiate({'$0': '1/2', '$1': '3'})
         self.assertEqual(url, 'bar/1/2/foo/3')
 
-    def test_instantiate_partial(self):
-        template = PathTemplate.from_string('bar/*/foo/*')
-        url = template.instantiate_partial({'$0': '_1'})
-        self.assertEqual(url, 'bar/_1/foo/*')
-
-    def test_instantiate_with_host_name(self):
-        template = PathTemplate.from_string('bar/*')
-        url = template.instantiate(PathTemplate.HOSTNAME_VAR, '//somewhere.io',
-                                   '$0', 'foo')
-        self.assertEqual(url, '//somewhere.io/bar/foo')
-
     def test_to_string(self):
-        template = PathTemplate.from_string('bar/**/foo/*')
-        self.assertEqual(str(template), 'bar/**/foo/*')
-        template = PathTemplate.from_string('buckets/*/objects/*:custom')
-        self.assertEqual(str(template), 'buckets/*/objects/*:custom')
-        template = PathTemplate.from_string('/buckets/{hello}')
-        self.assertEqual(str(template), 'buckets/{hello}')
-        template = PathTemplate.from_string('/buckets/{hello=what}/{world}')
-        self.assertEqual(str(template), 'buckets/{hello=what}/{world}')
+        template = PathTemplate('bar/**/foo/*')
+        self.assertEqual(str(template), 'bar/{$0=**}/foo/{$1=*}')
+        template = PathTemplate('buckets/*/objects/*:custom')
+        self.assertEqual(str(template), 'buckets/{$0=*}/objects/{$1=*}:custom')
+        template = PathTemplate('/buckets/{hello}')
+        self.assertEqual(str(template), 'buckets/{hello=*}')
+        template = PathTemplate('/buckets/{hello=what}/{world}')
+        self.assertEqual(str(template), 'buckets/{hello=what}/{world=*}')
