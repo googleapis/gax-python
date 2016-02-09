@@ -1,4 +1,4 @@
-# Copyright 2015, Google Inc.
+# Copyright 2016, Google Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -27,423 +27,261 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Classes and functions for path template generation."""
+"""Implements a utility for parsing and formatting path templates."""
 
 from __future__ import absolute_import
+from collections import namedtuple
 import re
-import urllib
 
-CUSTOM_VERB_PATTERN = re.compile(':([^/*}{=]+)$')
+from ply import lex, yacc
+
+_BINDING = 1
+_END_BINDING = 2
+_TERMINAL = 3
+_CUSTOM_VERB = 4
+_Segment = namedtuple('_Segment', ['kind', 'literal'])
 
 
-def _encode_url(text):
-    return urllib.quote(text.encode('utf8'), safe='')
-
-
-def _decode_url(url):
-    return urllib.unquote(url)
+def _format(segments):
+    template = ''
+    slash = True
+    for segment in segments:
+        if segment.kind == _TERMINAL:
+            if slash:
+                template += '/'
+            template += segment.literal
+        slash = True
+        if segment.kind == _BINDING:
+            template += '/{%s=' % segment.literal
+            slash = False
+        if segment.kind == _END_BINDING:
+            template += '%s}' % segment.literal
+        if segment.kind == _CUSTOM_VERB:
+            template += ':%s' % segment.literal
+    return template[1:]  # Remove the leading /
 
 
 class ValidationException(Exception):
-    """Indicates errors in path template parsing."""
+    """Represents a path template validation error."""
     pass
 
 
-class SegmentKind(object):
-    """Enumerates possible Segment types."""
-    # pylint: disable=too-few-public-methods
-    LITERAL = 1
-    CUSTOM_VERB = 2
-    WILDCARD = 3
-    PATH_WILDCARD = 4
-    BINDING = 5
-    END_BINDING = 6
-
-
-class Segment(object):
-    """Defines a single path template segment."""
-    # pylint: disable=too-few-public-methods
-    kind = None
-    value = None
-    separator = None
-
-    def __init__(self, kind, value):
-        self.kind = kind
-        self.value = value
-        if kind == SegmentKind.CUSTOM_VERB:
-            self.separator = ':'
-        elif kind == SegmentKind.END_BINDING:
-            self.separator = ''
-        else:
-            self.separator = '/'
-
-_WILDCARD_SEGMENT = Segment(SegmentKind.WILDCARD, '*')
-_PATH_WILDCARD_SEGMENT = Segment(SegmentKind.PATH_WILDCARD, '**')
-_END_BINDING_SEGMENT = Segment(SegmentKind.END_BINDING, '')
-
-
-def _parse_template(template):
-    """Splits a template into a list of path segments.
-
-    Args:
-        template: (str) A path template string.
-
-    Returns:
-        (list of Segment) A list of the parsed path segments.
-
-    Raises:
-        ValidationException: If there is a parsing error.
-    """
-    # pylint: disable=too-many-branches,too-many-statements
-    if template.startswith('/'):
-        template = template[1:]
-    custom_verb = None
-    match_obj = CUSTOM_VERB_PATTERN.search(template)
-    if match_obj:
-        custom_verb = match_obj.group(1)
-        template = template[0:match_obj.start(0)]
-    segment_list = []
-    var_name = None
-    free_wildcard_counter = 0
-    path_wildcard_bound = 0
-
-    for seg in [x.strip() for x in template.split('/')]:
-        binding_starts = seg.startswith('{')
-        implicit_wildcard = False
-        if binding_starts:
-            if var_name:
-                raise ValidationException(
-                    'parse error: nested binding in \'%s\'' % template)
-            seg = seg[1:]
-            i = seg.find('=')
-            if i <= 0:
-                if seg.endswith('}'):
-                    implicit_wildcard = True
-                    var_name = seg[:-1].strip()
-                    seg = seg[-1:].strip()
-                else:
-                    raise ValidationException(
-                        'parse error: invalid binding syntax in '
-                        '\'%s\'' % template)
-            else:
-                var_name = seg[0:i].strip()
-                seg = seg[i + 1:].strip()
-            segment_list.append(Segment(SegmentKind.BINDING, var_name))
-
-        binding_ends = seg.endswith('}')
-        if binding_ends:
-            seg = seg[0:-1].strip()
-
-        if seg == '**' or seg == '*':
-            if seg == '**':
-                path_wildcard_bound += 1
-
-            if len(seg) == 2:
-                wildcard = _PATH_WILDCARD_SEGMENT
-            else:
-                wildcard = _WILDCARD_SEGMENT
-
-            if var_name is None:
-                segment_list.append(
-                    Segment(SegmentKind.BINDING, '$%d' % free_wildcard_counter))
-                free_wildcard_counter += 1
-                segment_list.append(wildcard)
-                segment_list.append(_END_BINDING_SEGMENT)
-            else:
-                segment_list.append(wildcard)
-        elif not seg:
-            if not binding_ends:
-                raise ValidationException(
-                    'parse error: empty segment not allowed in '
-                    '\'%s\'' % template)
-        else:
-            segment_list.append(Segment(SegmentKind.LITERAL, seg))
-
-        if binding_ends:
-            var_name = None
-            if implicit_wildcard:
-                segment_list.append(_WILDCARD_SEGMENT)
-            segment_list.append(_END_BINDING_SEGMENT)
-        if path_wildcard_bound > 1:
-            raise ValidationException(
-                'parse error: pattern must not contain more than one path '
-                'wildcard (\'**\') in \'%s\'' % template)
-    if custom_verb:
-        segment_list.append(Segment(SegmentKind.CUSTOM_VERB, custom_verb))
-    return segment_list
-
-
 class PathTemplate(object):
-    """Representation of a path template."""
+    """Represents a path template."""
 
-    HOSTNAME_VAR = '$hostname'
-
-    bindings = None
     segments = None
+    segment_count = 0
 
-    def __init__(self, segments):
-        # Copy segments list.
-        self.segments = list(segments)
-        if not segments:
-            raise ValidationException('template cannot be empty.')
-        bindings = {}
-        for seg in self.segments:
-            if seg.kind == SegmentKind.BINDING:
-                if seg.value in bindings:
-                    raise ValidationException('duplicate binding \'%s\'',
-                                              seg.value)
-                bindings[seg.value] = seg
-        self.bindings = bindings
+    def __init__(self, data):
+        parser = _Parser()
+        self.segments = parser.parse(data)
+        self.segment_count = parser.segment_count
+
+    def __len__(self):
+        return self.segment_count
 
     def __repr__(self):
-        return self._to_syntax(True)
+        return _format(self.segments)
 
-    @classmethod
-    def from_string(cls, template):
-        """Creates a PathTemplate from a template string.
+    def instantiate(self, bindings):
+        """Instantiates a path template using the provided bindings.
 
         Args:
-            template: (str) A path template string.
+            bindings (dict): A dictionary of var names to binding strings.
 
         Returns:
-            (PathTemplate) A PathTemplate object.
+            str: An instantiated representation of this path template.
 
         Raises:
-            ValidationException: If there is a parsing error.
+            ValidationError: If a key isn't provided or if a sub-template can't
+                be parsed.
         """
-        return PathTemplate(_parse_template(template))
-
-    def _to_syntax(self, pretty):
-        """Returns a pretty version of the template as a string."""
-        result = ''
-        continue_last = True
-        iterator = iter(range(0, len(self.segments)))
-        for i in iterator:
-            seg = self.segments[i]
-            if not continue_last:
-                result += seg.separator
-            continue_last = False
-            if seg.kind == SegmentKind.BINDING:
-                if pretty and seg.value.startswith('$'):
-                    seg = self.segments[next(iterator)]
-                    result += seg.value
-                    next(iterator)
-                    continue
-                result += '{' + seg.value
-                if (pretty and i + 2 < len(self.segments) and
-                        self.segments[i + 1].kind == SegmentKind.WILDCARD and
-                        self.segments[i + 2].kind == SegmentKind.END_BINDING):
-                    next(iterator)
-                    next(iterator)
-                    result += '}'
-                    continue
-                result += '='
-                continue_last = True
-                continue
-            elif seg.kind == SegmentKind.END_BINDING:
-                result += '}'
-                continue
+        out = []
+        binding = False
+        for segment in self.segments:
+            if segment.kind == _BINDING:
+                if segment.literal not in bindings:
+                    raise ValidationException(
+                        'instantiate error: value for key \'%s\' not provided')
+                out.extend(PathTemplate(bindings[segment.literal]).segments)
+                binding = True
+            elif segment.kind == _END_BINDING:
+                binding = False
             else:
-                result += seg.value
-                continue
-        return result
+                if binding:
+                    continue
+                out.append(segment)
+        path = _format(out)
+        self.match(path)
+        return path
 
     def match(self, path):
-        """Returns a dict of variable names to matched values.
-
-        All matched values will be properly unescaped using URL encoding rules.
-        If the path does not match the template, None is returned.
+        """Matches a fully qualified path template string.
 
         Args:
-            path: (string) Path to match.
+            path (str): A fully qualified path template string.
 
         Returns:
-            (dict): A dictionary of variable names to matched values.
+            dict: Var names to matched binding values.
+
+        Raises:
+            ValidationException: If path can't be matched to the template.
         """
-        return self._match(path, False)
-
-    def match_from_full_name(self, path):
-        """Returns a dict of variable names to matched values from full name.
-
-        Matches the path, where the first segment is interpreted as the host
-        name regardless of whether it starts with '//' or not.
-
-        Args:
-            path: (string) Path to match.
-
-        Returns:
-            (dict): A dictionary of variable names to matched values.
-        """
-        return self._match(path, True)
-
-    def _match(self, path, force_host_name):
-        """Returns a dict of variable names to matched values."""
-        last = self.segments[-1]
-        if last.kind == SegmentKind.CUSTOM_VERB:
-            match_obj = CUSTOM_VERB_PATTERN.search(path)
-            if not match_obj or (
-                    _decode_url(match_obj.group(1)) != last.value):
-                return None
-            path = path[0:match_obj.start(0)]
-
-        # Do full match.
-        with_host_name = path.startswith('//')
-        if with_host_name:
-            path = path[2:]
-        inp = [x.strip() for x in path.split('/')]
-        in_pos = 0
-        values = {}
-        if with_host_name or force_host_name:
-            if not inp:
-                return None
-            host_name = inp[in_pos]
-            in_pos += 1
-            if with_host_name:
-                host_name = '//' + host_name
-            values[self.HOSTNAME_VAR] = host_name
-        if not self._match_segments(inp, in_pos, 0, values):
-            return None
-        return values
-
-    def _match_segments(self, inp, in_pos, seg_pos, values):
-        """Returns whether the segments match the input."""
-        # pylint: disable=too-many-branches
+        this = self.segments
+        that = re.split('[/:]', path)
+        if len(that) < self.segment_count:
+            raise ValidationException('match error: impossible match')
         current_var = None
-        while seg_pos < len(self.segments):
-            seg = self.segments[seg_pos]
-            seg_pos += 1
-            if seg.kind == SegmentKind.END_BINDING:
-                current_var = None
-                continue
-            elif seg.kind == SegmentKind.BINDING:
-                current_var = seg.value
-                continue
-            elif seg.kind == SegmentKind.CUSTOM_VERB:
-                break
-            else:
-                if in_pos >= len(inp):
-                    return False
-                next_val = _decode_url(inp[in_pos])
-                in_pos += 1
-                if seg.kind == SegmentKind.LITERAL:
-                    if seg.value != next_val:
-                        return False
-                if current_var:
-                    current = values.get(current_var)
-                    if not current:
-                        values[current_var] = next_val
-                    else:
-                        values[current_var] = current + '/' + next_val
-                if seg.kind == SegmentKind.PATH_WILDCARD:
-                    segs_to_match = 0
-                    for i in range(seg_pos, len(self.segments)):
-                        kind = self.segments[i].kind
-                        if (kind == SegmentKind.BINDING or
-                                kind == SegmentKind.END_BINDING):
-                            continue
-                        else:
-                            segs_to_match += 1
-                    available = len(inp) - in_pos - segs_to_match
-                    while available > 0:
-                        values[current_var] += '/'
-                        values[current_var] += _decode_url(inp[in_pos])
-                        in_pos += 1
-                        available -= 1
-        return in_pos == len(inp)
-
-    def instantiate(self, *args):
-        """Instantiate the template based on the given variable assignment.
-
-        Performs proper URL escaping of variable assignments. Note that free
-        wildcards in the template must have bindings of '$n' variables, where
-        'n' is the position of the wildcard (starting at 0).
-
-        Args:
-            *args: (str) A variable number of key value pairs.
-
-        Returns:
-            (str) An instantiated path template string.
-
-        Raises:
-            ValidationException: If there is a parsing error.
-        """
-        values = {}
-        for i in range(0, len(args), 2):
-            values[args[i]] = args[i + 1]
-        return self._instantiate(values, False)
-
-    def instantiate_partial(self, values):
-        """Instantiate the template based on the given variable assignment.
-
-        Similar to instantiate, but allows for unbound variables, which
-        are substituted with their original syntax.
-
-        Args:
-            values: (dict) A dictionary of binding pairs.
-
-        Returns:
-            (str) An instantiated path template string. Can be used to create a
-            new template.
-
-        Raises:
-            ValidationException: If there is a parsing error.
-        """
-        return self._instantiate(values, True)
-
-    def _instantiate(self, values, allow_partial):
-        """Instantiates the template based on the given variable assignment."""
-        # pylint: disable=too-many-branches,too-many-locals
-        result = ''
-        if self.HOSTNAME_VAR in values:
-            result += values[self.HOSTNAME_VAR] + '/'
-        continue_last = True
-        skip = False
-
-        iterator = iter(range(0, len(self.segments)))
-        for i in iterator:
-            seg = self.segments[i]
-            if not skip and not continue_last:
-                result += seg.separator
-            continue_last = False
-            if seg.kind == SegmentKind.BINDING:
-                var = seg.value
-                if seg.value not in values:
-                    if not allow_partial:
-                        raise ValidationException(
-                            'unbound variable \'%s\'. bindings: %s' % (var,
-                                                                       values))
-                    if var.startswith('$'):
-                        result += self.segments[i + 1].value
-                        next(iterator)
-                        next(iterator)
-                        continue
-                    result += '{' + seg.value + '='
-                    continue_last = True
-                    continue
-
-                value = values[seg.value]
-
-                next_segment = self.segments[i + 1]
-                next_next_segment = self.segments[i + 2]
-                path_escape = next_segment.kind == SegmentKind.PATH_WILDCARD
-                path_escape |= next_next_segment.kind != SegmentKind.END_BINDING
-                if not path_escape:
-                    result += _encode_url(value)
+        bindings = {}
+        j = 0
+        for i in range(0, len(this)):
+            if this[i].kind in [_TERMINAL, _CUSTOM_VERB]:
+                if this[i].literal == '*':
+                    bindings[current_var] = that[j]
+                    j += 1
+                elif this[i].literal == '**':
+                    until = j + len(that) - self.segment_count + 1
+                    bindings[current_var] = '/'.join(
+                        that[j:until])
+                    j = until
+                elif this[i].literal != that[j]:
+                    raise ValidationException(
+                        'mismatched literal: \'%s\' != \'%s\'' % (
+                            this[i].literal, that[j]))
                 else:
-                    first = True
-                    for sub_seg in [x.strip() for x in value.split('/')]:
-                        if not first:
-                            result += '/'
-                        first = False
-                        result += _encode_url(sub_seg)
-                skip = True
-                continue
-            elif seg.kind == SegmentKind.END_BINDING:
-                if not skip:
-                    result += '}'
-                skip = False
-                continue
-            else:
-                if not skip:
-                    result += seg.value
-        return result
+                    j += 1
+            elif this[i].kind == _BINDING:
+                current_var = this[i].literal
+            elif this[i].kind == _END_BINDING:
+                current_var = None
+        return bindings
+
+
+# pylint: disable=C0103
+# pylint: disable=R0201
+class _Parser(object):
+    tokens = (
+        'FORWARD_SLASH',
+        'LEFT_BRACE',
+        'RIGHT_BRACE',
+        'EQUALS',
+        'COLON',
+        'WILDCARD',
+        'PATH_WILDCARD',
+        'LITERAL',
+    )
+
+    t_FORWARD_SLASH = r'/'
+    t_LEFT_BRACE = r'\{'
+    t_RIGHT_BRACE = r'\}'
+    t_EQUALS = r'='
+    t_COLON = r':'
+    t_WILDCARD = r'\*'
+    t_PATH_WILDCARD = r'\*\*'
+    t_LITERAL = r'[_a-zA-Z0-9]+'
+
+    t_ignore = ' \t'
+
+    binding_var_count = 0
+    segment_count = 0
+
+    def __init__(self):
+        self.lexer = lex.lex(module=self)
+        self.parser = yacc.yacc(module=self, debug=0, write_tables=0)
+
+    def parse(self, data):
+        """Returns a list of path template segments parsed from data.
+
+        Args:
+            data: A path template string.
+        Returns:
+            A list of _Segment.
+        """
+        self.binding_var_count = 0
+        self.segment_count = 0
+
+        segments = self.parser.parse(data)
+        # Validation step: checks that there are no nested bindings.
+        path_wildcard = False
+        for segment in segments:
+            if segment.kind == _TERMINAL and segment.literal == '**':
+                if path_wildcard:
+                    raise ValidationException(
+                        'validation error: path template cannot contain more '
+                        'than one path wildcard')
+                path_wildcard = True
+        return segments
+
+    def p_extraneous(self, p):
+        """extraneous : FORWARD_SLASH template
+                      | template"""
+        # ply fails on a negative index.
+        p[0] = p[len(p) - 1]
+
+    def p_template(self, p):
+        """template : bound_segments COLON LITERAL
+                    | bound_segments"""
+        p[0] = p[1]
+        if len(p) > 2:
+            p[0].append(_Segment(_CUSTOM_VERB, p[3]))
+            self.segment_count += 1
+
+    def p_bound_segments(self, p):
+        """bound_segments : bound_segment FORWARD_SLASH bound_segments
+                          | bound_segment"""
+        p[0] = p[1]
+        if len(p) > 2:
+            p[0].extend(p[3])
+
+    def p_unbound_segments(self, p):
+        """unbound_segments : unbound_terminal FORWARD_SLASH unbound_segments
+                            | unbound_terminal"""
+        p[0] = p[1]
+        if len(p) > 2:
+            p[0].extend(p[3])
+
+    def p_bound_segment(self, p):
+        """bound_segment : bound_terminal
+                         | variable"""
+        p[0] = p[1]
+
+    def p_unbound_terminal(self, p):
+        """unbound_terminal : WILDCARD
+                            | PATH_WILDCARD
+                            | LITERAL"""
+        p[0] = [_Segment(_TERMINAL, p[1])]
+        self.segment_count += 1
+
+    def p_bound_terminal(self, p):
+        """bound_terminal : unbound_terminal"""
+        if p[1][0].literal in ['*', '**']:
+            p[0] = [_Segment(_BINDING, '$%d' % self.binding_var_count),
+                    p[1][0],
+                    _Segment(_END_BINDING, '')]
+            self.binding_var_count += 1
+        else:
+            p[0] = p[1]
+
+    def p_variable(self, p):
+        """variable : LEFT_BRACE LITERAL EQUALS unbound_segments RIGHT_BRACE
+                    | LEFT_BRACE LITERAL RIGHT_BRACE"""
+        p[0] = [_Segment(_BINDING, p[2])]
+        if len(p) > 4:
+            p[0].extend(p[4])
+        else:
+            p[0].append(_Segment(_TERMINAL, '*'))
+            self.segment_count += 1
+        p[0].append(_Segment(_END_BINDING, ''))
+
+    def t_error(self, t):
+        """Raises a scanner error."""
+        raise ValidationException(
+            'scanner error: illegal character \'%s\'' % t.value[0])
+
+    def p_error(self, p):
+        """Raises a parser error."""
+        if p:
+            raise ValidationException(
+                'parser error: unexpected token \'%s\'' % p.type)
+        else:
+            raise ValidationException('parser error: unexpected EOF')
