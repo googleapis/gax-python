@@ -35,6 +35,7 @@ import re
 
 from ply import lex, yacc
 
+_CUSTOM_VERB_PATTERN = re.compile(':([^/*}{=]+)$')
 _BINDING = 1
 _END_BINDING = 2
 _TERMINAL = 3
@@ -59,6 +60,15 @@ def _format(segments):
         if segment.kind == _CUSTOM_VERB:
             template += ':%s' % segment.literal
     return template[1:]  # Remove the leading /
+
+
+def _parse_custom_verb(data):
+    custom_verb = None
+    match_obj = _CUSTOM_VERB_PATTERN.search(data)
+    if match_obj:
+        custom_verb = match_obj.group(1)
+        data = data[0:-len(custom_verb) - 1]
+    return custom_verb, data
 
 
 class ValidationException(Exception):
@@ -128,23 +138,29 @@ class PathTemplate(object):
             ValidationException: If path can't be matched to the template.
         """
         this = self.segments
-        that = re.split('[/:]', path)
-        if len(that) < self.segment_count:
-            raise ValidationException('match error: impossible match')
+        custom_verb, path = _parse_custom_verb(path)
+        that = path.split('/')
+        if custom_verb:
+            that.append(custom_verb)
         current_var = None
         bindings = {}
+        segment_count = self.segment_count
         j = 0
         for i in range(0, len(this)):
+            if j >= len(that):
+                break
             if this[i].kind in [_TERMINAL, _CUSTOM_VERB]:
                 if this[i].literal == '*':
                     bindings[current_var] = that[j]
                     j += 1
                 elif this[i].literal == '**':
-                    until = j + len(that) - self.segment_count + 1
-                    bindings[current_var] = '/'.join(
-                        that[j:until])
+                    until = j + len(that) - segment_count + 1
+                    segment_count += len(that) - segment_count
+                    print segment_count, until
+                    bindings[current_var] = '/'.join(that[j:until])
                     j = until
                 elif this[i].literal != that[j]:
+                    print path, i, j
                     raise ValidationException(
                         'mismatched literal: \'%s\' != \'%s\'' % (
                             this[i].literal, that[j]))
@@ -152,8 +168,8 @@ class PathTemplate(object):
                     j += 1
             elif this[i].kind == _BINDING:
                 current_var = this[i].literal
-            elif this[i].kind == _END_BINDING:
-                current_var = None
+        if j != len(that) or j != segment_count:
+            raise ValidationException('match error: impossible match')
         return bindings
 
 
@@ -165,7 +181,6 @@ class _Parser(object):
         'LEFT_BRACE',
         'RIGHT_BRACE',
         'EQUALS',
-        'COLON',
         'WILDCARD',
         'PATH_WILDCARD',
         'LITERAL',
@@ -175,10 +190,9 @@ class _Parser(object):
     t_LEFT_BRACE = r'\{'
     t_RIGHT_BRACE = r'\}'
     t_EQUALS = r'='
-    t_COLON = r':'
     t_WILDCARD = r'\*'
     t_PATH_WILDCARD = r'\*\*'
-    t_LITERAL = r'[_a-zA-Z0-9]+'
+    t_LITERAL = r'[^/}{=\*]+'
 
     t_ignore = ' \t'
 
@@ -200,7 +214,11 @@ class _Parser(object):
         self.binding_var_count = 0
         self.segment_count = 0
 
+        custom_verb, data = _parse_custom_verb(data)
         segments = self.parser.parse(data)
+        if custom_verb:
+            segments.append(_Segment(_CUSTOM_VERB, custom_verb))
+            self.segment_count += 1
         # Validation step: checks that there are no nested bindings.
         path_wildcard = False
         for segment in segments:
@@ -212,19 +230,11 @@ class _Parser(object):
                 path_wildcard = True
         return segments
 
-    def p_extraneous(self, p):
-        """extraneous : FORWARD_SLASH template
-                      | template"""
+    def p_template(self, p):
+        """template : FORWARD_SLASH bound_segments
+                    | bound_segments"""
         # ply fails on a negative index.
         p[0] = p[len(p) - 1]
-
-    def p_template(self, p):
-        """template : bound_segments COLON LITERAL
-                    | bound_segments"""
-        p[0] = p[1]
-        if len(p) > 2:
-            p[0].append(_Segment(_CUSTOM_VERB, p[3]))
-            self.segment_count += 1
 
     def p_bound_segments(self, p):
         """bound_segments : bound_segment FORWARD_SLASH bound_segments
@@ -272,11 +282,6 @@ class _Parser(object):
             p[0].append(_Segment(_TERMINAL, '*'))
             self.segment_count += 1
         p[0].append(_Segment(_END_BINDING, ''))
-
-    def t_error(self, t):
-        """Raises a scanner error."""
-        raise ValidationException(
-            'scanner error: illegal character \'%s\'' % t.value[0])
 
     def p_error(self, p):
         """Raises a parser error."""
