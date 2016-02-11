@@ -62,7 +62,7 @@ setup(
     long_description=open('README.rst').read(),
     author='Google API Authors',
     author_email='googleapis-packages@google.com',
-    url='',
+    url='https://github.com/googleapis/gax-python',
     namespace_packages = ['google'],
     packages=find_packages(),
     package_dir={'google-gax': 'google'},
