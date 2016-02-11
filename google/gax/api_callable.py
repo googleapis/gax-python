@@ -37,12 +37,12 @@ def _add_timeout_arg(a_func, timeout):
     """Updates a_func so that it gets called with the timeout as its final arg.
 
     This converts a callable, a_func, into another callable with an additional
-    positional arg
+    positional arg.
 
     Args:
       a_func (callable): a callable to be updated
       timeout (int): to be added the original callable as it final positional
-        args
+        args.
 
 
     Returns:
@@ -90,16 +90,15 @@ def _page_streamable(a_func,
                      response_page_token_field,
                      resource_field,
                      timeout):
-    """Creates a function equivalent to the input API call, but that performs
-    page streaming through the iterable returned by the new function.
+    """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
-        call: A page-streaming API call.
+        a_func: a call to a page streamable API
         request_page_token_field: The field of the page token in the request.
         response_page_token_field: The field of the next page token in the
             response.
         resource_field: The field to be streamed.
-        timeout: the timeout to apply to the API call
+        timeout: the timeout to apply to the API call.
 
     Returns:
         A function that returns an iterable over the specified field.
@@ -120,7 +119,7 @@ def _page_streamable(a_func,
     return inner
 
 
-class ApiCallableDefaults(object):
+class CallOptions(object):
     """Encapsulates the default settings for ApiCallable."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
@@ -135,7 +134,7 @@ class ApiCallableDefaults(object):
                 for a retrying call to this service.
 
         Returns:
-            An ApiCallableDefaults object.
+            An CallOptions object.
         """
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
@@ -159,7 +158,7 @@ def idempotent_callable(func, timeout=None, is_retrying=None,
         max_attempts: If is_retrying, the maximum number of times this call may
             be attempted. If not specified, will default to the value in the
             defaults parameter.
-        defaults: An ApiCallableDefaults object, from which default values will
+        defaults: A CallOptions object, from which default values will
             be drawn if not supplied by the other named parameters. The other
             named parameters always override those in the defaults. If neither
             the is_retrying nor defaults parameter is specified, a runtime
@@ -200,7 +199,7 @@ class ApiCallable(object):
             max_attempts: If is_retrying, the maximum number of times this call
                 may be attempted. If not specified, will default to the value
                 in the defaults parameter.
-            defaults: An ApiCallableDefaults object, from which default values
+            defaults: A CallOptions object, from which default values
                 will be drawn if not supplied by the other named parameters.
                 The other named parameters always override those in the
                 defaults. If neither the defaults nor timeout parameter is
@@ -225,7 +224,7 @@ class ApiCallable(object):
     def __call__(self, *args, **kwargs):
         the_func = self.func
 
-        # Update thefunc with each of the applicable function decorators
+        # Update the_func using each of the applicable function decorators
         # before calling.
         if self.is_retrying:
             the_func = _retryable(the_func, self.max_attempts)

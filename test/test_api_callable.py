@@ -115,26 +115,26 @@ class TestApiCallable(unittest2.TestCase):
                              list(range(page_size * pages_to_stream)))
 
     def test_defaults_override_apicallable_defaults(self):
-        defaults = api_callable.ApiCallableDefaults(timeout=10, max_attempts=6)
+        defaults = api_callable.CallOptions(timeout=10, max_attempts=6)
         callable1 = api_callable.ApiCallable(None, defaults=defaults)
         self.assertEqual(callable1.timeout, 10)
         self.assertEqual(callable1.max_attempts, 6)
 
     def test_constructor_values_override_defaults(self):
-        defaults = api_callable.ApiCallableDefaults(timeout=10, max_attempts=6)
+        defaults = api_callable.CallOptions(timeout=10, max_attempts=6)
         callable2 = api_callable.ApiCallable(
             None, timeout=100, max_attempts=60, defaults=defaults)
         self.assertEqual(callable2.timeout, 100)
         self.assertEqual(callable2.max_attempts, 60)
 
     def test_idempotent_default_retry(self):
-        defaults = api_callable.ApiCallableDefaults(
+        defaults = api_callable.CallOptions(
             is_idempotent_retrying=True)
         my_callable = api_callable.idempotent_callable(None, defaults=defaults)
         self.assertTrue(my_callable.is_retrying)
 
     def test_idempotent_default_override(self):
-        defaults = api_callable.ApiCallableDefaults(
+        defaults = api_callable.CallOptions(
             is_idempotent_retrying=False)
         my_callable = api_callable.idempotent_callable(
             None, is_retrying=True, defaults=defaults)
