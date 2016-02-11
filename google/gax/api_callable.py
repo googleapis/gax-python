@@ -33,19 +33,32 @@ from __future__ import absolute_import
 from . import config
 
 
-def _retrying(max_attempts, call, args, kwargs):
-    """Attempts to call a function up to max_attempt times."""
-    try:
-        return call(*args, **kwargs)
-    except config.RETRY_EXCEPTIONS:
-        if max_attempts <= 1:
-            raise
-        else:
-            return _retrying(max_attempts - 1, call, args, kwargs)
+def _add_timeout_arg(a_func, timeout):
+    """Updates a_func so that it gets called with the timeout as its final arg.
+
+    This converts a callable, a_func, into another callable with an additional
+    positional arg.
+
+    Args:
+      a_func (callable): a callable to be updated
+      timeout (int): to be added the original callable as it final positional
+        args.
 
 
-def _retryable(call, max_attempts):
-    """Creates a function equivalent to call, but that retries on certain
+    Returns:
+      callable: the original callable updated to the timeout arg
+    """
+
+    def inner(*args, **kw):
+        """Updates args with the timeout."""
+        updated_args = args + (timeout,)
+        return a_func(*updated_args, **kw)
+
+    return inner
+
+
+def _retryable(a_func, max_attempts):
+    """Creates a function equivalent to retrying, but that retries on certain
     exceptions.
 
     Args:
@@ -56,58 +69,57 @@ def _retryable(call, max_attempts):
     Returns:
         A function that will retry on exception.
     """
-    return lambda *args, **kwargs: _retrying(max_attempts, call, args, kwargs)
+
+    def inner(*args, **kwargs):
+        "Retries a_func upto max_attempt times"
+        attempt_count = 0
+        while 1:
+            try:
+                return a_func(*args, **kwargs)
+            except config.RETRY_EXCEPTIONS:
+                attempt_count += 1
+                if attempt_count < max_attempts:
+                    continue
+                raise
+
+    return inner
 
 
-def _page_streaming(call, request, timeout, request_page_token_field,
-                    response_page_token_field, resource_field):
-    """Creates an iterable that performs page streaming for a gRPC call.
-
-    Args:
-        call: A gRPC call taking a proto request and a timeout whose return
-            type contains a field for a page token and a repeated field
-            representing a resource.
-        request: The proto request to the gRPC call.
-        timeout: The timeout for the call.
-        request_page_token_field: The field of the page token in the request
-            proto.
-        response_page_token_field: The field of the page token in the response.
-        resource_field: The field to iterate over in the response.
-
-    Returns:
-        An iterable over the resource field of the gRPC call's return type.
-    """
-    while True:
-        response = call(request, timeout)
-        for obj in getattr(response, resource_field):
-            yield obj
-        next_page_token = getattr(response, response_page_token_field)
-        if not next_page_token:
-            break
-        setattr(request, request_page_token_field, next_page_token)
-
-
-def _page_streamable(call, request_page_token_field, response_page_token_field,
-                     resource_field):
-    """Creates a function equivalent to the input gRPC call, but that performs
-    page streaming through the iterable returned by the new function.
+def _page_streamable(a_func,
+                     request_page_token_field,
+                     response_page_token_field,
+                     resource_field,
+                     timeout):
+    """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
-        call: A page-streaming gRPC call.
+        a_func: a call to a page streamable API
         request_page_token_field: The field of the page token in the request.
         response_page_token_field: The field of the next page token in the
             response.
         resource_field: The field to be streamed.
+        timeout: the timeout to apply to the API call.
 
     Returns:
         A function that returns an iterable over the specified field.
     """
-    return lambda request, timeout: _page_streaming(
-        call, request, timeout, request_page_token_field,
-        response_page_token_field, resource_field)
+    with_timeout = _add_timeout_arg(a_func, timeout)
+
+    def inner(request):
+        """A generator that yields all the paged responses."""
+        while True:
+            response = with_timeout(request)
+            for obj in getattr(response, resource_field):
+                yield obj
+            next_page_token = getattr(response, response_page_token_field)
+            if not next_page_token:
+                break
+            setattr(request, request_page_token_field, next_page_token)
+
+    return inner
 
 
-class ApiCallableDefaults(object):
+class CallOptions(object):
     """Encapsulates the default settings for ApiCallable."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
@@ -115,14 +127,14 @@ class ApiCallableDefaults(object):
         """Constructor.
 
         Args:
-            timeout: The client-side timeout for gRPC calls.
+            timeout: The client-side timeout for API calls.
             is_idempotent_retrying: If set, calls determined by configuration
                 to be idempotent will retry upon transient error by default.
             max_attempts: The maximum number of attempts that should be made
                 for a retrying call to this service.
 
         Returns:
-            An ApiCallableDefaults object.
+            An CallOptions object.
         """
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
@@ -134,8 +146,8 @@ def idempotent_callable(func, timeout=None, is_retrying=None,
     """Creates an ApiCallable for an idempotent call.
 
     Args:
-        func: The gRPC call that this ApiCallable wraps.
-        timeout: The timeout parameter to the gRPC call. If not supplied, will
+        func: The API call that this ApiCallable wraps.
+        timeout: The timeout parameter to the API call. If not supplied, will
             default to the value in the defaults parameter.
         is_retrying: Boolean indicating whether this call should retry upon a
             transient error. If None, retrying will be determined by the
@@ -146,7 +158,7 @@ def idempotent_callable(func, timeout=None, is_retrying=None,
         max_attempts: If is_retrying, the maximum number of times this call may
             be attempted. If not specified, will default to the value in the
             defaults parameter.
-        defaults: An ApiCallableDefaults object, from which default values will
+        defaults: A CallOptions object, from which default values will
             be drawn if not supplied by the other named parameters. The other
             named parameters always override those in the defaults. If neither
             the is_retrying nor defaults parameter is specified, a runtime
@@ -165,7 +177,7 @@ def idempotent_callable(func, timeout=None, is_retrying=None,
 
 
 class ApiCallable(object):
-    """Represents zero or more gRPC calls, with options to retry or perform
+    """Represents zero or more API calls, with options to retry or perform
     page streaming.
 
     Calling an object of ApiCallable type causes these calls to be transmitted.
@@ -176,8 +188,8 @@ class ApiCallable(object):
         """Constructor.
 
         Args:
-            func: The gRPC call that this ApiCallable wraps.
-            timeout: The timeout parameter to the gRPC call. If not supplied,
+            func: The API call that this ApiCallable wraps.
+            timeout: The timeout parameter to the API call. If not supplied,
                 will default to the value in the defaults parameter.
             is_retrying: Boolean indicating whether this call should retry upon
                 a transient error.
@@ -187,7 +199,7 @@ class ApiCallable(object):
             max_attempts: If is_retrying, the maximum number of times this call
                 may be attempted. If not specified, will default to the value
                 in the defaults parameter.
-            defaults: An ApiCallableDefaults object, from which default values
+            defaults: A CallOptions object, from which default values
                 will be drawn if not supplied by the other named parameters.
                 The other named parameters always override those in the
                 defaults. If neither the defaults nor timeout parameter is
@@ -201,30 +213,28 @@ class ApiCallable(object):
         self.func = func
         self.is_retrying = is_retrying
         self.page_descriptor = page_streaming
-        if max_attempts is None:
-            self.max_attempts = None if defaults is None else defaults.max_attempts
-        else:
-            self.max_attempts = max_attempts
-        self.timeout = defaults.timeout if timeout is None else timeout
+        self.max_attempts = max_attempts
+        self.timeout = timeout
+        if defaults is not None:
+            if max_attempts is None:
+                self.max_attempts = defaults.max_attempts
+            if timeout is None:
+                self.timeout = defaults.timeout
 
-    def __call__(self, request):
-        to_call = self.func
+    def __call__(self, *args, **kwargs):
+        the_func = self.func
+
+        # Update the_func using each of the applicable function decorators
+        # before calling.
         if self.is_retrying:
-            to_call = _retryable(to_call, self.max_attempts)
+            the_func = _retryable(the_func, self.max_attempts)
         if self.page_descriptor:
-            to_call = _page_streamable(
-                to_call, self.page_descriptor.request_page_token_field,
+            the_func = _page_streamable(
+                the_func,
+                self.page_descriptor.request_page_token_field,
                 self.page_descriptor.response_page_token_field,
-                self.page_descriptor.resource_field)
-        return to_call(request, self.timeout)
-
-    def call(self, request):
-        """Calls the function wrapped by this ApiCallable.
-
-        Args:
-            request: The proto request object to be passed in the gRPC call.
-
-        Returns:
-            The result type of the wrapped function.
-        """
-        return self.__call__(request)
+                self.page_descriptor.resource_field,
+                self.timeout)
+        else:
+            the_func = _add_timeout_arg(the_func, self.timeout)
+        return the_func(*args, **kwargs)
