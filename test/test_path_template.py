@@ -46,6 +46,9 @@ class TestPathTemplate(unittest2.TestCase):
         template = PathTemplate('hello/world')
         self.assertRaises(ValidationException,
                           template.match, 'hello')
+        template = PathTemplate('hello/world')
+        self.assertRaises(ValidationException,
+                          template.match, 'hello/world/fail')
 
     def test_fail_mismatched_literal(self):
         template = PathTemplate('hello/world')
@@ -59,10 +62,6 @@ class TestPathTemplate(unittest2.TestCase):
     def test_fail_if_inner_binding(self):
         self.assertRaises(ValidationException,
                           PathTemplate, 'buckets/{hello={world}}')
-
-    def test_fail_illegal_char(self):
-        self.assertRaises(ValidationException,
-                          PathTemplate, 'a/b?')
 
     def test_fail_unexpected_eof(self):
         self.assertRaises(ValidationException,
@@ -120,3 +119,5 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual(str(template), 'buckets/{hello=*}')
         template = PathTemplate('/buckets/{hello=what}/{world}')
         self.assertEqual(str(template), 'buckets/{hello=what}/{world=*}')
+        template = PathTemplate('/buckets/hello?#$##:what')
+        self.assertEqual(str(template), 'buckets/hello?#$##:what')
