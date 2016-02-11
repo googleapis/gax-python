@@ -156,11 +156,9 @@ class PathTemplate(object):
                 elif this[i].literal == '**':
                     until = j + len(that) - segment_count + 1
                     segment_count += len(that) - segment_count
-                    print segment_count, until
                     bindings[current_var] = '/'.join(that[j:until])
                     j = until
                 elif this[i].literal != that[j]:
-                    print path, i, j
                     raise ValidationException(
                         'mismatched literal: \'%s\' != \'%s\'' % (
                             this[i].literal, that[j]))
