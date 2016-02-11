@@ -58,13 +58,13 @@ def _add_timeout_arg(a_func, timeout):
 
 
 def _retryable(a_func, max_attempts):
-    """Creates a function equivalent to retrying, but that retries on certain
+    """Creates a function equivalent to a_func, but that retries on certain
     exceptions.
 
     Args:
-        call: A function.
-        max_attempts: The maximum number of times that the call should be
-            attempted; the call will always be attempted at least once.
+        a_func (callable): A callable.
+        max_attempts (int): The maximum number of times that the call should
+            be attempted; the call will always be attempted at least once.
 
     Returns:
         A function that will retry on exception.
@@ -93,7 +93,7 @@ def _page_streamable(a_func,
     """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
-        a_func: a call to a page streamable API
+        a_func: an API call that is page streaming.
         request_page_token_field: The field of the page token in the request.
         response_page_token_field: The field of the next page token in the
             response.
