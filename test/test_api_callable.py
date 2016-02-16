@@ -115,27 +115,68 @@ class TestApiCallable(unittest2.TestCase):
                              list(range(page_size * pages_to_stream)))
 
     def test_defaults_override_apicallable_defaults(self):
-        defaults = api_callable.CallOptions(timeout=10, max_attempts=6)
+        defaults = api_callable.ApiCallDefaults(timeout=10, max_attempts=6)
         callable1 = api_callable.ApiCallable(None, defaults=defaults)
         self.assertEqual(callable1.timeout, 10)
         self.assertEqual(callable1.max_attempts, 6)
 
     def test_constructor_values_override_defaults(self):
-        defaults = api_callable.CallOptions(timeout=10, max_attempts=6)
+        defaults = api_callable.ApiCallDefaults(timeout=10, max_attempts=6)
         callable2 = api_callable.ApiCallable(
             None, timeout=100, max_attempts=60, defaults=defaults)
         self.assertEqual(callable2.timeout, 100)
         self.assertEqual(callable2.max_attempts, 60)
 
     def test_idempotent_default_retry(self):
-        defaults = api_callable.CallOptions(
+        defaults = api_callable.ApiCallDefaults(
             is_idempotent_retrying=True)
         my_callable = api_callable.idempotent_callable(None, defaults=defaults)
         self.assertTrue(my_callable.is_retrying)
 
     def test_idempotent_default_override(self):
-        defaults = api_callable.CallOptions(
+        defaults = api_callable.ApiCallDefaults(
             is_idempotent_retrying=False)
         my_callable = api_callable.idempotent_callable(
             None, is_retrying=True, defaults=defaults)
         self.assertTrue(my_callable.is_retrying)
+
+    def test_call_options_simple(self):
+        options = api_callable.CallOptions(timeout=23, is_retrying=True)
+        self.assertEqual(options.timeout, 23)
+        self.assertTrue(options.is_retrying)
+        self.assertEqual(options.page_streaming, api_callable.OPTION_INHERIT)
+        self.assertEqual(options.max_attempts, api_callable.OPTION_INHERIT)
+
+    def test_call_options_update(self):
+        first = api_callable.CallOptions(timeout=46, is_retrying=True)
+        second = api_callable.CallOptions(
+            timeout=9, page_streaming=False, max_attempts=16)
+        first.update(second)
+        self.assertEqual(first.timeout, 9)
+        self.assertTrue(first.is_retrying)
+        self.assertFalse(first.page_streaming)
+        self.assertEqual(first.max_attempts, 16)
+
+    def test_call_options_update_none(self):
+        options = api_callable.CallOptions(timeout=23, page_streaming=False)
+        options.update(None)
+        self.assertEqual(options.timeout, 23)
+        self.assertEqual(options.is_retrying, api_callable.OPTION_INHERIT)
+        self.assertFalse(options.page_streaming)
+        self.assertEqual(options.max_attempts, api_callable.OPTION_INHERIT)
+
+    def test_call_options_normalize(self):
+        options = api_callable.CallOptions(timeout=23, is_retrying=True)
+        options.normalize()
+        self.assertEqual(options.timeout, 23)
+        self.assertTrue(options.is_retrying)
+        self.assertIsNone(options.page_streaming)
+        self.assertIsNone(options.max_attempts)
+
+    def test_call_options_normalize_default(self):
+        options = api_callable.CallOptions()
+        options.normalize()
+        self.assertIsNone(options.timeout)
+        self.assertIsNone(options.is_retrying)
+        self.assertIsNone(options.page_streaming)
+        self.assertIsNone(options.max_attempts)

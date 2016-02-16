@@ -33,6 +33,14 @@ from __future__ import absolute_import
 from . import config
 
 
+OPTION_INHERIT = object()
+"""Global constant.
+
+If a CallOptions field is set to OPTION_INHERIT, the call
+to which that CallOptions belong will attempt to inherit that field from the
+its default settings."""
+
+
 def _add_timeout_arg(a_func, timeout):
     """Updates a_func so that it gets called with the timeout as its final arg.
 
@@ -119,8 +127,8 @@ def _page_streamable(a_func,
     return inner
 
 
-class CallOptions(object):
-    """Encapsulates the default settings for ApiCallable."""
+class ApiCallDefaults(object):
+    """Encapsulates the default settings for all ApiCallables in an API"""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
                  max_attempts=16):
@@ -134,11 +142,66 @@ class CallOptions(object):
                 for a retrying call to this service.
 
         Returns:
-            An CallOptions object.
+            An ApiCallDefaults object.
         """
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
         self.max_attempts = max_attempts
+
+
+class CallOptions(object):
+    """Encapsulates the default settings for a particular API call"""
+    # pylint: disable=too-few-public-methods
+    def __init__(self, timeout=OPTION_INHERIT, is_retrying=OPTION_INHERIT,
+                 max_attempts=OPTION_INHERIT, page_streaming=OPTION_INHERIT):
+        """Constructor.
+
+        Args:
+            timeout: The client-side timeout for API calls.
+            is_retrying: If set, call will retry upon transient error by
+                default.
+            max_attempts: The maximum number of attempts that should be made
+                for a retrying call to this service.
+            page_streaming: page_descriptor.PageDescriptor indicating the
+                structure of page streaming to be performed. If set to None
+                no page streaming is performed.
+
+        Returns:
+            A CallOptions object.
+        """
+        self.timeout = timeout
+        self.is_retrying = is_retrying
+        self.max_attempts = max_attempts
+        self.page_streaming = page_streaming
+
+    def update(self, options):
+        """Merges another CallOptions object into this one.
+
+        Args:
+            options: A CallOptions object whose values are override those in
+                this object. If None, `update` has no effect.
+        """
+        if not options:
+            return
+        if options.timeout != OPTION_INHERIT:
+            self.timeout = options.timeout
+        if options.is_retrying != OPTION_INHERIT:
+            self.is_retrying = options.is_retrying
+        if options.max_attempts != OPTION_INHERIT:
+            self.max_attempts = options.max_attempts
+        if options.page_streaming != OPTION_INHERIT:
+            self.page_streaming = options.page_streaming
+
+    def normalize(self):
+        """Transforms fields set to OPTION_INHERIT to None."""
+        if self.timeout == OPTION_INHERIT:
+            self.timeout = None
+        if self.is_retrying == OPTION_INHERIT:
+            self.is_retrying = None
+        if self.max_attempts == OPTION_INHERIT:
+            self.max_attempts = None
+        if self.page_streaming == OPTION_INHERIT:
+            self.page_streaming = None
 
 
 def idempotent_callable(func, timeout=None, is_retrying=None,
@@ -158,7 +221,7 @@ def idempotent_callable(func, timeout=None, is_retrying=None,
         max_attempts: If is_retrying, the maximum number of times this call may
             be attempted. If not specified, will default to the value in the
             defaults parameter.
-        defaults: A CallOptions object, from which default values will
+        defaults: A ApiCallDefaults object, from which default values will
             be drawn if not supplied by the other named parameters. The other
             named parameters always override those in the defaults. If neither
             the is_retrying nor defaults parameter is specified, a runtime
@@ -199,7 +262,7 @@ class ApiCallable(object):
             max_attempts: If is_retrying, the maximum number of times this call
                 may be attempted. If not specified, will default to the value
                 in the defaults parameter.
-            defaults: A CallOptions object, from which default values
+            defaults: A ApiCallDefaults object, from which default values
                 will be drawn if not supplied by the other named parameters.
                 The other named parameters always override those in the
                 defaults. If neither the defaults nor timeout parameter is
