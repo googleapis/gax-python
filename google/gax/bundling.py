@@ -128,32 +128,40 @@ class Task(object):
         except Exception as exc:  # pylint: disable=broad-except
             self.out_deque.append(exc)
 
-    def append(self, msg):
-        """Adds a msg to the in_queue."""
-        self.in_deque.append(msg)
+    def extend(self, msgs):
+        """Adds msgs to the in_queue."""
+        self.in_deque.extend(msgs)
 
-    def canceller_for(self, msg):
-        """Obtains a cancellation function for msg.
+    def canceller_for(self, msgs):
+        """Obtains a cancellation function that removes msgs
 
-`        The returned cancellation function returns ``True`` if the message
+`        The returned cancellation function returns ``True`` if all messages
         was removed successfully from the in_deque, and false if it was not.
 
 
         Args:
-           msg (object): the message to be cancelled
+           msgs (iterable): the messages to be cancelled
 
         Returns:
-           (callable[[], boolean]): used to remove the message from the in_deque
+           (callable[[], boolean]): used to remove the messages from the
+              in_deque
 
         """
 
         def canceller():
-            """Cancels submission of ``msg`` as part of this bundle."""
-            try:
-                self.in_deque.remove(msg)
-                return True
-            except ValueError:
-                return False
+            """Cancels submission of ``msgs`` as part of this bundle.
+
+            Returns:
+               ``False`` if any of messages had already been sent, otherwise
+               ``True``
+            """
+            result = True
+            for msg in msgs:
+                try:
+                    self.in_deque.remove(msg)
+                except ValueError:
+                    result = False
+            return result
 
         return canceller
 
@@ -206,8 +214,8 @@ class Executor(object):
         """
         bundle = self._bundle_for(api_call, bundle_id, bundled_field,
                                   bundling_request)
-        msg = getattr(bundling_request, bundled_field)
-        bundle.append(msg)
+        msgs = getattr(bundling_request, bundled_field)
+        bundle.extend(msgs)
 
         # Run the bundle if the count threshold was reached.
         count_threshold = self._options.message_count_threshold
@@ -221,7 +229,7 @@ class Executor(object):
             self._run_now(bundle.bundle_id)
             return bundle.out_deque, None
 
-        return bundle.out_deque, bundle.canceller_for(msg)
+        return bundle.out_deque, bundle.canceller_for(msgs)
 
     def _bundle_for(self, api_call, bundle_id, bundled_field, bundling_request):
         with self._task_lock:

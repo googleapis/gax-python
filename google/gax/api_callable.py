@@ -161,7 +161,7 @@ class ApiCallDefaults(object):
     """Encapsulates the default settings for all ApiCallables in an API"""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
-                 max_attempts=16, bundle_settings=None):
+                 max_attempts=16, bundle_options=None, bundler=None):
         """Constructor.
 
         Args:
@@ -171,7 +171,8 @@ class ApiCallDefaults(object):
                 by default.
             max_attempts (int): The maximum number of attempts that should be
                 made for a retrying call to this service.
-            bundle_settings (BundleOptions): (optional) configures bundling
+            bundle_options (BundleOptions): (optional) configures bundling
+            bundler (bundle.Executor): (optional) orchestrates bundling
 
         Returns:
             An ApiCallDefaults object.
@@ -179,7 +180,8 @@ class ApiCallDefaults(object):
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
         self.max_attempts = max_attempts
-        self.bundle_settings = bundle_settings
+        self.bundle_options = bundle_options
+        self.bundler = bundler
 
 
 class CallOptions(object):

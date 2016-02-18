@@ -50,8 +50,7 @@ class BundleDescriptor(
         collections.namedtuple(
             'BundleDescriptor',
             ['bundled_field',
-             'request_descriminator_fields',
-             'response_field'])):
+             'request_descriminator_fields'])):
     """Describes the structure of bundled call.
 
     request_descriminator_fields may include '.' as a separator, which is used
@@ -60,14 +59,10 @@ class BundleDescriptor(
 
     Attributes:
       bundled_field: the repeated field in the request message that
-        will have it messages aggregated by bundling
-      request_descriminator_fields: a set fields in the
+        will have its messages aggregated by bundling
+      request_descriminator_fields: a list of fields in the
         target request message class that are used to determine
         which messages should be bundled together.
-      response_field: the optional repeated field in the response
-        that contains distinct values that per each distinct message
-        in the bundle field
-
     """
     pass
 
@@ -95,14 +90,13 @@ class BundleOptions(
     # pylint: disable=too-few-public-methods
 
     def __new__(cls,
-                message_count_threshold=1,
+                message_count_threshold=0,
                 message_bytesize_threshold=0,
                 delay_threshold=0):
         """Invokes the base constructor with default values.
 
-        The default values are 1 for message_count_threshold and 0 for the other
-        attributes, so when constructed with default args, so a bundle using all
-        the defaults will trigger the api call immediately.
+        The default values are zero for all attributes and it's necessary to
+        specify at least one valid threshold value during construction.
 
         Args:
            message_count_threshold: the bundled request will be sent once
@@ -113,6 +107,13 @@ class BundleOptions(
               time after the first message in the bundle was added to it.
 
         """
+        assert isinstance(message_count_threshold, int), 'should be an int'
+        assert isinstance(message_bytesize_threshold, int), 'should be an int'
+        assert isinstance(delay_threshold, int), 'should be an int'
+        assert (message_bytesize_threshold > 0 or
+                message_count_threshold > 0 or
+                delay_threshold > 0), 'one threshold should be > 0'
+
         return super(cls, BundleOptions).__new__(
             cls,
             message_count_threshold,

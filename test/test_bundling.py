@@ -49,7 +49,7 @@ class _Simple(object):
                 self.field2 == other.field2)
 
     def __str__(self):
-        return "field1={0}, field2={1}".format(self.field1, self.field2)
+        return 'field1={0}, field2={1}'.format(self.field1, self.field2)
 
 
 class _Outer(object):
@@ -133,9 +133,8 @@ def _make_a_test_task(api_call=_return_request):
         _Simple('dummy_value'))
 
 
-def _append_msg_n_times(a_task, msg, n):
-    for _ in range(n):
-        a_task.append(msg)
+def _extend_with_n_msgs(a_task, msg, n):
+    a_task.extend([msg] * n)
 
 
 def _raise_exc(dummy_req):
@@ -145,7 +144,7 @@ def _raise_exc(dummy_req):
 
 class TestTask(unittest2.TestCase):
 
-    def test_append_increases_the_message_count(self):
+    def test_extend_increases_the_message_count(self):
         simple_msg = 'a simple msg'
         tests = [
             {
@@ -153,11 +152,11 @@ class TestTask(unittest2.TestCase):
                 'message': 'no messages added',
                 'want': 0
             }, {
-                'update': (lambda t: t.append(simple_msg)),
+                'update': (lambda t: t.extend([simple_msg])),
                 'message': 'a single message added',
                 'want': 1
             }, {
-                'update': (lambda t: _append_msg_n_times(t, simple_msg, 5)),
+                'update': (lambda t: _extend_with_n_msgs(t, simple_msg, 5)),
                 'message': 'a 5 messages added',
                 'want': 5
             }
@@ -169,7 +168,7 @@ class TestTask(unittest2.TestCase):
             message = 'bad message count when {}'.format(t['message'])
             self.assertEquals(got, t['want'], message)
 
-    def test_append_increases_the_message_bytesize(self):
+    def test_extend_increases_the_message_bytesize(self):
         simple_msg = 'a simple msg'
         tests = [
             {
@@ -177,11 +176,11 @@ class TestTask(unittest2.TestCase):
                 'message': 'no messages added',
                 'want': 0
             }, {
-                'update': (lambda t: t.append(simple_msg)),
+                'update': (lambda t: t.extend([simple_msg])),
                 'message': 'a single bundle message',
                 'want': len(simple_msg)
             }, {
-                'update': (lambda t: _append_msg_n_times(t, simple_msg, 5)),
+                'update': (lambda t: _extend_with_n_msgs(t, simple_msg, 5)),
                 'message': '5 bundled messages',
                 'want': 5 * len(simple_msg)
             }
@@ -202,12 +201,12 @@ class TestTask(unittest2.TestCase):
                 'count_before_run': 0,
                 'want': []
             }, {
-                'update': (lambda t: t.append(simple_msg)),
+                'update': (lambda t: t.extend([simple_msg])),
                 'message': 'a single bundled message',
                 'count_before_run': 1,
                 'want': [_Simple([simple_msg])]
             }, {
-                'update': (lambda t: _append_msg_n_times(t, simple_msg, 5)),
+                'update': (lambda t: _extend_with_n_msgs(t, simple_msg, 5)),
                 'message': '5 bundle messages',
                 'count_before_run': 5,
                 'want': [_Simple([simple_msg] * 5)]
@@ -227,7 +226,7 @@ class TestTask(unittest2.TestCase):
     def test_run_adds_an_error_if_execution_fails(self):
         simple_msg = 'a simple msg'
         test_task = _make_a_test_task(api_call=_raise_exc)
-        test_task.append(simple_msg)
+        test_task.extend([simple_msg])
         self.assertEquals(test_task.message_count, 1)
         test_task.run()
         self.assertEquals(test_task.message_count, 0)
@@ -239,10 +238,10 @@ class TestTask(unittest2.TestCase):
         a_msg = 'a simple msg'
         another_msg = 'another msg'
         test_task = _make_a_test_task()
-        test_task.append(a_msg)
-        test_task.append(another_msg)
+        test_task.extend([a_msg])
+        test_task.extend([another_msg])
         self.assertEquals(test_task.message_count, 2)
-        canceller = test_task.canceller_for(a_msg)
+        canceller = test_task.canceller_for([a_msg])
         self.assertTrue(canceller())
         self.assertEquals(test_task.message_count, 1)
         self.assertFalse(canceller())
@@ -254,20 +253,7 @@ class TestTask(unittest2.TestCase):
 
 class TestExecutor(unittest2.TestCase):
 
-    def test_schedule_executes_immediately_with_noarg_options(self):
-        a_msg = 'dummy message'
-        an_id = 'bundle_id'
-        bundler = bundling.Executor(BundleOptions())
-        got_queue, got_canceller = bundler.schedule(
-            _return_request,
-            an_id,
-            'field1',
-            _Simple(a_msg)
-        )
-        self.assertIsNone(got_canceller)
-        self.assertEquals([_Simple([a_msg])], list(got_queue))
-
-    def test_api_calls_grouped_by_bundle_id(self):
+    def test_api_calls_are_grouped_by_bundle_id(self):
         a_msg = 'dummy message'
         api_call = _return_request
         bundle_ids = ['id1', 'id2']
@@ -281,7 +267,7 @@ class TestExecutor(unittest2.TestCase):
                     api_call,
                     an_id,
                     'field1',
-                    _Simple(a_msg)
+                    _Simple([a_msg])
                 )
                 if current_queue is None:
                     current_queue = got_queue
@@ -296,7 +282,7 @@ class TestExecutor(unittest2.TestCase):
                 api_call,
                 an_id,
                 'field1',
-                _Simple(a_msg)
+                _Simple([a_msg])
             )
             self.assertIsNone(got_canceller, 'expected None as canceller')
             self.assertEquals([_Simple([a_msg] * threshold)], list(got_queue))
@@ -316,7 +302,7 @@ class TestExecutor_MessageCountTrigger(unittest2.TestCase):
                 api_call,
                 an_id,
                 'field1',
-                _Simple(a_msg)
+                _Simple([a_msg])
             )
             if i + 1 < threshold:
                 self.assertIsNotNone(
@@ -340,15 +326,14 @@ class TestExecutor_MessageByteSizeTrigger(unittest2.TestCase):
         api_call = _return_request
         msgs_for_threshold = 3
         threshold = msgs_for_threshold * len(a_msg)  # arbitrary
-        options = BundleOptions(message_count_threshold=0,
-                                message_bytesize_threshold=threshold)
+        options = BundleOptions(message_bytesize_threshold=threshold)
         bundler = bundling.Executor(options)
         for i in range(msgs_for_threshold):
             got_queue, got_canceller = bundler.schedule(
                 api_call,
                 an_id,
                 'field1',
-                _Simple(a_msg)
+                _Simple([a_msg])
             )
             if i + 1 < msgs_for_threshold:
                 self.assertIsNotNone(
@@ -372,14 +357,13 @@ class TestExecutor_DelayThreshold(unittest2.TestCase):
         an_id = 'bundle_id'
         api_call = _return_request
         delay_threshold = 3
-        options = BundleOptions(message_count_threshold=0,
-                                delay_threshold=delay_threshold)
+        options = BundleOptions(delay_threshold=delay_threshold)
         bundler = bundling.Executor(options)
         got_queue, got_canceller = bundler.schedule(
             api_call,
             an_id,
             'field1',
-            _Simple(a_msg)
+            _Simple([a_msg])
         )
         self.assertIsNotNone(got_canceller, 'missing canceller after first msg')
         self.assertEquals([], list(got_queue))
