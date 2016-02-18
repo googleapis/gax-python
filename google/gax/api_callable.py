@@ -30,7 +30,8 @@
 """Provides function wrappers that implement page streaming and retrying."""
 
 from __future__ import absolute_import
-from . import config
+
+from . import bundling, config
 
 
 OPTION_INHERIT = object()
@@ -49,8 +50,8 @@ def _add_timeout_arg(a_func, timeout):
 
     Args:
       a_func (callable): a callable to be updated
-      timeout (int): to be added the original callable as it final positional
-        args.
+      timeout (int): to be added to the original callable as it final positional
+        arg.
 
 
     Returns:
@@ -93,6 +94,35 @@ def _retryable(a_func, max_attempts):
     return inner
 
 
+def _bundleable(a_func, desc, bundler):
+    """Creates a function that transforms an API call into a bundling call.
+
+    It transform a_func from an API call that receives the requests and returns
+    the response into a callable that receives the same request, and
+    returns two values (collections.deque, callable[[], boolean]).
+
+    The collections.deque will eventually contain the response to the call to
+    bundle; the second value when not None is a cancellation function to stop
+    the request from being used in the bundle.
+
+    Args:
+        a_func (callable[[req], resp]): an API call that supports bundling.
+        desc (gax.BundleDescriptor): describes the bundling that a_func supports
+        bundler (gax.bundling.Executor): orchestrates bundling
+
+    Returns:
+        callable: it takes the API call's request and returns the two
+          values described above
+
+    """
+    def inner(request):
+        """Schedules execution of a bundling task."""
+        the_id = bundling.compute_bundle_id(request, desc.discriminator_fields)
+        return bundler.schedule(a_func, the_id, desc.bundled_field, request)
+
+    return inner
+
+
 def _page_streamable(a_func,
                      request_page_token_field,
                      response_page_token_field,
@@ -104,7 +134,7 @@ def _page_streamable(a_func,
         a_func: an API call that is page streaming.
         request_page_token_field: The field of the page token in the request.
         response_page_token_field: The field of the next page token in the
-            response.
+          response.
         resource_field: The field to be streamed.
         timeout: the timeout to apply to the API call.
 
@@ -131,15 +161,18 @@ class ApiCallDefaults(object):
     """Encapsulates the default settings for all ApiCallables in an API"""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
-                 max_attempts=16):
+                 max_attempts=16, bundle_options=None, bundler=None):
         """Constructor.
 
         Args:
-            timeout: The client-side timeout for API calls.
-            is_idempotent_retrying: If set, calls determined by configuration
-                to be idempotent will retry upon transient error by default.
-            max_attempts: The maximum number of attempts that should be made
-                for a retrying call to this service.
+            timeout (int): The client-side timeout for API calls.
+            is_idempotent_retrying (bool): If set, calls determined by
+                configuration to be idempotent will retry upon transient error
+                by default.
+            max_attempts (int): The maximum number of attempts that should be
+                made for a retrying call to this service.
+            bundle_options (BundleOptions): (optional) configures bundling
+            bundler (bundle.Executor): (optional) orchestrates bundling
 
         Returns:
             An ApiCallDefaults object.
@@ -147,6 +180,8 @@ class ApiCallDefaults(object):
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
         self.max_attempts = max_attempts
+        self.bundle_options = bundle_options
+        self.bundler = bundler
 
 
 class CallOptions(object):
