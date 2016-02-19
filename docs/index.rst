@@ -18,6 +18,7 @@ Contents:
    google.gax
    google.gax.auth
    google.gax.api_callable
+   google.gax.bundling
    google.gax.config
    google.gax.grpc
    google.gax.path_template
