@@ -37,9 +37,9 @@ from . import bundling, config
 OPTION_INHERIT = object()
 """Global constant.
 
-If a CallOptions field is set to OPTION_INHERIT, the call
-to which that CallOptions belong will attempt to inherit that field from the
-its default settings."""
+If a CallOptions field is set to OPTION_INHERIT, the call to which that
+CallOptions belongs will attempt to inherit that field from its default
+settings."""
 
 
 def _add_timeout_arg(a_func, timeout):
@@ -239,41 +239,6 @@ class CallOptions(object):
             self.page_streaming = None
 
 
-def idempotent_callable(func, timeout=None, is_retrying=None,
-                        page_streaming=None, max_attempts=None, defaults=None):
-    """Creates an ApiCallable for an idempotent call.
-
-    Args:
-        func: The API call that this ApiCallable wraps.
-        timeout: The timeout parameter to the API call. If not supplied, will
-            default to the value in the defaults parameter.
-        is_retrying: Boolean indicating whether this call should retry upon a
-            transient error. If None, retrying will be determined by the
-            defaults parameter.
-        page_streaming: page_descriptor.PageDescriptor indicating the structure
-            of page streaming to be performed. If None, this call will not
-            perform page streaming.
-        max_attempts: If is_retrying, the maximum number of times this call may
-            be attempted. If not specified, will default to the value in the
-            defaults parameter.
-        defaults: A ApiCallDefaults object, from which default values will
-            be drawn if not supplied by the other named parameters. The other
-            named parameters always override those in the defaults. If neither
-            the is_retrying nor defaults parameter is specified, a runtime
-            error will result at callable creation time.
-
-    Returns:
-        An ApiCallable object.
-    """
-    if is_retrying is None:
-        to_retry = defaults.is_idempotent_retrying
-    else:
-        to_retry = is_retrying
-    return ApiCallable(
-        func, timeout=timeout, page_streaming=page_streaming,
-        max_attempts=max_attempts, defaults=defaults, is_retrying=to_retry)
-
-
 class ApiCallable(object):
     """Represents zero or more API calls, with options to retry or perform
     page streaming.
@@ -281,58 +246,64 @@ class ApiCallable(object):
     Calling an object of ApiCallable type causes these calls to be transmitted.
     """
     # pylint: disable=too-few-public-methods
-    def __init__(self, func, timeout=None, is_retrying=False,
-                 page_streaming=None, max_attempts=None, defaults=None):
+    def __init__(self, func, options=None, defaults=None, is_idempotent=False):
         """Constructor.
 
         Args:
             func: The API call that this ApiCallable wraps.
-            timeout: The timeout parameter to the API call. If not supplied,
-                will default to the value in the defaults parameter.
-            is_retrying: Boolean indicating whether this call should retry upon
-                a transient error.
-            page_streaming: page_descriptor.PageDescriptor indicating the
-                structure of page streaming to be performed. If None, this call
-                will not perform page streaming.
-            max_attempts: If is_retrying, the maximum number of times this call
-                may be attempted. If not specified, will default to the value
-                in the defaults parameter.
+            options: A CallOptions object from which the settings for this call
+                are drawn.
             defaults: A ApiCallDefaults object, from which default values
-                will be drawn if not supplied by the other named parameters.
-                The other named parameters always override those in the
-                defaults. If neither the defaults nor timeout parameter is
-                specified, a runtime error will result at call time. If neither
-                the defaults nor the max_attempts parameter is specified for a
-                retrying call, a runtime error will result at call time.
+                will be drawn if not supplied by `options`. The parameters in
+                `options` always override those in `defaults`. If the `timeout`
+                setting cannot be determined from either `options` or
+                `defaults`, a runtime error will result at call time. If the
+                `max_attempts` setting cannot be determined either from
+                `options` or `defaults`, a runtime error will result at call
+                time.
+            is_idempotent: If set, this call is marked as idempotent. Idempotent
+                calls' default retrying behavior may be set in `defaults`.
 
         Returns:
             An ApiCallable object.
         """
+        self.options = CallOptions() if options is None else options
+        self.defaults = defaults
         self.func = func
-        self.is_retrying = is_retrying
-        self.page_descriptor = page_streaming
-        self.max_attempts = max_attempts
-        self.timeout = timeout
-        if defaults is not None:
+        self.is_idempotent = is_idempotent
+
+    def _call_settings(self):
+        self.options.normalize()
+        if self.is_idempotent and self.options.is_retrying is None:
+            is_retrying = self.defaults.is_idempotent_retrying
+        else:
+            is_retrying = self.options.is_retrying
+        page_descriptor = self.options.page_streaming
+        max_attempts = self.options.max_attempts
+        timeout = self.options.timeout
+        if self.defaults is not None:
             if max_attempts is None:
-                self.max_attempts = defaults.max_attempts
+                max_attempts = self.defaults.max_attempts
             if timeout is None:
-                self.timeout = defaults.timeout
+                timeout = self.defaults.timeout
+        return is_retrying, max_attempts, page_descriptor, timeout
+
 
     def __call__(self, *args, **kwargs):
         the_func = self.func
+        is_retrying, max_attempts, page_desc, timeout = self._call_settings()
 
         # Update the_func using each of the applicable function decorators
         # before calling.
-        if self.is_retrying:
-            the_func = _retryable(the_func, self.max_attempts)
-        if self.page_descriptor:
+        if is_retrying:
+            the_func = _retryable(the_func, max_attempts)
+        if page_desc:
             the_func = _page_streamable(
                 the_func,
-                self.page_descriptor.request_page_token_field,
-                self.page_descriptor.response_page_token_field,
-                self.page_descriptor.resource_field,
-                self.timeout)
+                page_desc.request_page_token_field,
+                page_desc.response_page_token_field,
+                page_desc.resource_field,
+                timeout)
         else:
-            the_func = _add_timeout_arg(the_func, self.timeout)
+            the_func = _add_timeout_arg(the_func, timeout)
         return the_func(*args, **kwargs)

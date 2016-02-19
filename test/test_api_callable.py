@@ -27,7 +27,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
+# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name,protected-access
 """Unit tests for api_callable"""
 
 from __future__ import absolute_import
@@ -43,8 +43,7 @@ _DUMMY_ERROR = face.AbortionError(None, None, None, None)
 class TestApiCallable(unittest2.TestCase):
 
     def test_call_api_callable(self):
-        my_callable = api_callable.ApiCallable(lambda _req, _timeout: 42,
-                                               timeout=0)
+        my_callable = api_callable.ApiCallable(lambda _req, _timeout: 42)
         self.assertEqual(my_callable(None), 42)
 
     def test_retry(self):
@@ -55,9 +54,9 @@ class TestApiCallable(unittest2.TestCase):
             mock_grpc.side_effect = ([_DUMMY_ERROR] * (to_attempt - 1) +
                                      [mock.DEFAULT])
             mock_grpc.return_value = 1729
-            my_callable = api_callable.ApiCallable(
-                mock_grpc, timeout=0, is_retrying=True,
-                max_attempts=to_attempt)
+            options = api_callable.CallOptions(
+                timeout=0, is_retrying=True, max_attempts=to_attempt)
+            my_callable = api_callable.ApiCallable(mock_grpc, options=options)
             self.assertEqual(my_callable(None), 1729)
             self.assertEqual(mock_grpc.call_count, to_attempt)
 
@@ -66,9 +65,9 @@ class TestApiCallable(unittest2.TestCase):
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
             mock_grpc.side_effect = _DUMMY_ERROR
-            my_callable = api_callable.ApiCallable(
-                mock_grpc, timeout=0, is_retrying=True,
-                max_attempts=to_attempt)
+            options = api_callable.CallOptions(
+                timeout=0, is_retrying=True, max_attempts=to_attempt)
+            my_callable = api_callable.ApiCallable(mock_grpc, options=options)
             self.assertRaises(face.AbortionError, my_callable, None)
             self.assertEqual(mock_grpc.call_count, to_attempt)
 
@@ -109,36 +108,44 @@ class TestApiCallable(unittest2.TestCase):
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
             mock_grpc.side_effect = grpc_return_value
-            my_callable = api_callable.ApiCallable(
-                mock_grpc, timeout=0, page_streaming=mock_grpc_func_descriptor)
+            options = api_callable.CallOptions(
+                page_streaming=mock_grpc_func_descriptor, timeout=0)
+            my_callable = api_callable.ApiCallable(mock_grpc, options=options)
             self.assertEqual(list(my_callable(PageStreamingRequest())),
                              list(range(page_size * pages_to_stream)))
 
     def test_defaults_override_apicallable_defaults(self):
         defaults = api_callable.ApiCallDefaults(timeout=10, max_attempts=6)
-        callable1 = api_callable.ApiCallable(None, defaults=defaults)
-        self.assertEqual(callable1.timeout, 10)
-        self.assertEqual(callable1.max_attempts, 6)
+        my_callable = api_callable.ApiCallable(None, defaults=defaults)
+        _, max_attempts, _, timeout = my_callable._call_settings()
+        self.assertEqual(timeout, 10)
+        self.assertEqual(max_attempts, 6)
 
     def test_constructor_values_override_defaults(self):
         defaults = api_callable.ApiCallDefaults(timeout=10, max_attempts=6)
-        callable2 = api_callable.ApiCallable(
-            None, timeout=100, max_attempts=60, defaults=defaults)
-        self.assertEqual(callable2.timeout, 100)
-        self.assertEqual(callable2.max_attempts, 60)
+        options = api_callable.CallOptions(timeout=100, max_attempts=60)
+        my_callable = api_callable.ApiCallable(
+            None, options=options, defaults=defaults)
+        _, max_attempts, _, timeout = my_callable._call_settings()
+        self.assertEqual(timeout, 100)
+        self.assertEqual(max_attempts, 60)
 
     def test_idempotent_default_retry(self):
         defaults = api_callable.ApiCallDefaults(
             is_idempotent_retrying=True)
-        my_callable = api_callable.idempotent_callable(None, defaults=defaults)
-        self.assertTrue(my_callable.is_retrying)
+        my_callable = api_callable.ApiCallable(
+            None, defaults=defaults, is_idempotent=True)
+        is_retrying, _, _, _ = my_callable._call_settings()
+        self.assertTrue(is_retrying)
 
     def test_idempotent_default_override(self):
         defaults = api_callable.ApiCallDefaults(
             is_idempotent_retrying=False)
-        my_callable = api_callable.idempotent_callable(
-            None, is_retrying=True, defaults=defaults)
-        self.assertTrue(my_callable.is_retrying)
+        options = api_callable.CallOptions(is_retrying=True)
+        my_callable = api_callable.ApiCallable(
+            None, options=options, defaults=defaults, is_idempotent=True)
+        is_retrying, _, _, _ = my_callable._call_settings()
+        self.assertTrue(is_retrying)
 
     def test_call_options_simple(self):
         options = api_callable.CallOptions(timeout=23, is_retrying=True)
