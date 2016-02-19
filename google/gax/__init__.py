@@ -50,7 +50,8 @@ class BundleDescriptor(
         collections.namedtuple(
             'BundleDescriptor',
             ['bundled_field',
-             'request_descriminator_fields'])):
+             'request_descriminator_fields',
+             'subresponse_field'])):
     """Describes the structure of bundled call.
 
     request_descriminator_fields may include '.' as a separator, which is used
@@ -63,8 +64,19 @@ class BundleDescriptor(
       request_descriminator_fields: a list of fields in the
         target request message class that are used to determine
         which messages should be bundled together.
+      subresponse_field: an optional field, when present it indicates the field
+        in the response message that should be used to demultiplex the response
+        into multiple response messages.
     """
-    pass
+    def __new__(cls,
+                bundled_field,
+                request_descriminator_fields,
+                subresponse_field=None):
+        return super(cls, BundleDescriptor).__new__(
+            cls,
+            bundled_field,
+            request_descriminator_fields,
+            subresponse_field)
 
 
 class BundleOptions(

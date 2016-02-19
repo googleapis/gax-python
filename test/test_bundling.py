@@ -35,7 +35,7 @@ from __future__ import absolute_import
 import mock
 import unittest2
 
-from google.gax import bundling, BundleOptions
+from google.gax import bundling, BundleOptions, BundleDescriptor
 
 
 # pylint: disable=too-few-public-methods
@@ -134,7 +134,7 @@ def _make_a_test_task(api_call=_return_request):
 
 
 def _extend_with_n_msgs(a_task, msg, n):
-    a_task.extend([msg] * n)
+    return a_task.extend([msg] * n)
 
 
 def _raise_exc(dummy_req):
@@ -198,57 +198,68 @@ class TestTask(unittest2.TestCase):
             {
                 'update': (lambda t: None),
                 'message': 'no messages added',
+                'has_event': False,
                 'count_before_run': 0,
                 'want': []
             }, {
                 'update': (lambda t: t.extend([simple_msg])),
                 'message': 'a single bundled message',
+                'has_event': True,
                 'count_before_run': 1,
-                'want': [_Simple([simple_msg])]
+                'want': _Simple([simple_msg])
             }, {
                 'update': (lambda t: _extend_with_n_msgs(t, simple_msg, 5)),
                 'message': '5 bundle messages',
+                'has_event': True,
                 'count_before_run': 5,
-                'want': [_Simple([simple_msg] * 5)]
+                'want': _Simple([simple_msg] * 5)
             }
         ]
         for t in tests:
             test_task = _make_a_test_task()
-            t['update'](test_task)
+            event = t['update'](test_task)
             self.assertEquals(test_task.message_count, t['count_before_run'])
             test_task.run()
-            got = list(test_task.out_deque)
-            message = 'bad output when run with {}'.format(t['message'])
-            self.assertEquals(got, t['want'], message)
             self.assertEquals(test_task.message_count, 0)
             self.assertEquals(test_task.message_bytesize, 0)
+            if t['has_event']:
+                self.assertIsNotNone(
+                    event,
+                    'expected event for {}'.format(t['message']))
+                got = event.result
+                message = 'bad output when run with {}'.format(t['message'])
+                self.assertEquals(got, t['want'], message)
 
     def test_run_adds_an_error_if_execution_fails(self):
         simple_msg = 'a simple msg'
         test_task = _make_a_test_task(api_call=_raise_exc)
-        test_task.extend([simple_msg])
+        event = test_task.extend([simple_msg])
         self.assertEquals(test_task.message_count, 1)
         test_task.run()
         self.assertEquals(test_task.message_count, 0)
         self.assertEquals(test_task.message_bytesize, 0)
-        self.assertEquals(len(test_task.out_deque), 1)
-        self.assertTrue(isinstance(test_task.out_deque[0], ValueError))
+        self.assertTrue(isinstance(event.result, ValueError))
 
     def test_calling_the_canceller_stops_the_message_from_getting_sent(self):
         a_msg = 'a simple msg'
         another_msg = 'another msg'
         test_task = _make_a_test_task()
-        test_task.extend([a_msg])
-        test_task.extend([another_msg])
+        an_event = test_task.extend([a_msg])
+        another_event = test_task.extend([another_msg])
         self.assertEquals(test_task.message_count, 2)
-        canceller = test_task.canceller_for([a_msg])
-        self.assertTrue(canceller())
+        self.assertTrue(an_event.cancel())
         self.assertEquals(test_task.message_count, 1)
-        self.assertFalse(canceller())
+        self.assertFalse(an_event.cancel())
         self.assertEquals(test_task.message_count, 1)
         test_task.run()
         self.assertEquals(test_task.message_count, 0)
-        self.assertEquals([_Simple([another_msg])], list(test_task.out_deque))
+        self.assertEquals(_Simple([another_msg]), another_event.result)
+        self.assertFalse(an_event.is_set())
+        self.assertIsNone(an_event.result)
+
+
+SIMPLE_DESCRIPTOR = BundleDescriptor('field1', [])
+DEMUX_DESCRIPTOR = BundleDescriptor('field1', [], subresponse_field='field1')
 
 
 class TestExecutor(unittest2.TestCase):
@@ -261,31 +272,127 @@ class TestExecutor(unittest2.TestCase):
         options = BundleOptions(message_count_threshold=threshold)
         bundler = bundling.Executor(options)
         for an_id in bundle_ids:
-            current_queue = None
             for i in range(threshold - 1):
-                got_queue, got_canceller = bundler.schedule(
+                got_event = bundler.schedule(
                     api_call,
                     an_id,
-                    'field1',
+                    SIMPLE_DESCRIPTOR,
                     _Simple([a_msg])
                 )
-                if current_queue is None:
-                    current_queue = got_queue
-                else:
-                    self.assertEquals(current_queue, got_queue)
                 self.assertIsNotNone(
-                    got_canceller,
+                    got_event.canceller,
                     'missing canceller after message #{}'.format(i))
-                self.assertEquals([], list(got_queue))
+                self.assertFalse(
+                    got_event.is_set(),
+                    'event unexpectedly set after message #{}'.format(i))
+                self.assertIsNone(got_event.result)
         for an_id in bundle_ids:
-            got_queue, got_canceller = bundler.schedule(
+            got_event = bundler.schedule(
                 api_call,
                 an_id,
-                'field1',
+                SIMPLE_DESCRIPTOR,
                 _Simple([a_msg])
             )
-            self.assertIsNone(got_canceller, 'expected None as canceller')
-            self.assertEquals([_Simple([a_msg] * threshold)], list(got_queue))
+            self.assertIsNotNone(got_event.canceller,
+                                 'missing expected canceller')
+            self.assertTrue(
+                got_event.is_set(),
+                'event is not set after triggering message')
+            self.assertEquals(_Simple([a_msg] * threshold),
+                              got_event.result)
+
+    def test_each_event_has_exception_when_demuxed_api_call_fails(self):
+        a_msg = 'dummy message'
+        api_call = _raise_exc
+        bundle_id = 'an_id'
+        threshold = 5  # arbitrary, greater than 1
+        options = BundleOptions(message_count_threshold=threshold)
+        bundler = bundling.Executor(options)
+        events = []
+        for i in range(threshold - 1):
+            got_event = bundler.schedule(
+                api_call,
+                bundle_id,
+                DEMUX_DESCRIPTOR,
+                _Simple(['%s%d' % (a_msg, i)])
+            )
+            self.assertFalse(
+                got_event.is_set(),
+                'event unexpectedly set after message #{}'.format(i))
+            self.assertIsNone(got_event.result)
+            events.append(got_event)
+        last_event = bundler.schedule(
+            api_call,
+            bundle_id,
+            DEMUX_DESCRIPTOR,
+            _Simple(['%s%d' % (a_msg, threshold - 1)])
+        )
+        events.append(last_event)
+
+        previous_event = None
+        for event in events:
+            if previous_event:
+                self.assertTrue(previous_event != event)
+            self.assertTrue(event.is_set(),
+                            'event is not set after triggering message')
+            self.assertTrue(isinstance(event.result, ValueError))
+            previous_event = event
+
+    def test_each_event_has_its_result_from_a_demuxed_api_call(self):
+        a_msg = 'dummy message'
+        api_call = _return_request
+        bundle_id = 'an_id'
+        threshold = 5  # arbitrary, greater than 1
+        options = BundleOptions(message_count_threshold=threshold)
+        bundler = bundling.Executor(options)
+        events = []
+
+        # send 3 groups of messages of different sizes in the bundle
+        for i in range(1, 4):
+            got_event = bundler.schedule(
+                api_call,
+                bundle_id,
+                DEMUX_DESCRIPTOR,
+                _Simple(['%s%d' % (a_msg, i)] * i)
+            )
+            events.append(got_event)
+        previous_event = None
+        for i, event in enumerate(events):
+            index = i + 1
+            if previous_event:
+                self.assertTrue(previous_event != event)
+            self.assertTrue(event.is_set(),
+                            'event is not set after triggering message')
+            self.assertEquals(event.result,
+                              _Simple(['%s%d' % (a_msg, index)] * index))
+            previous_event = event
+
+    def test_each_event_has_same_result_from_mismatched_demuxed_api_call(self):
+        a_msg = 'dummy message'
+        mismatched_result = _Simple([a_msg, a_msg])
+        bundle_id = 'an_id'
+        threshold = 5  # arbitrary, greater than 1
+        options = BundleOptions(message_count_threshold=threshold)
+        bundler = bundling.Executor(options)
+        events = []
+
+        # send 3 groups of messages of different sizes in the bundle
+        for i in range(1, 4):
+            got_event = bundler.schedule(
+                lambda x: mismatched_result,
+                bundle_id,
+                DEMUX_DESCRIPTOR,
+                _Simple(['%s%d' % (a_msg, i)] * i)
+            )
+            events.append(got_event)
+        previous_event = None
+        for i, event in enumerate(events):
+            if previous_event:
+                self.assertTrue(previous_event != event)
+            self.assertTrue(event.is_set(),
+                            'event is not set after triggering message')
+            self.assertEquals(event.result, mismatched_result)
+            previous_event = event
 
 
 class TestExecutor_MessageCountTrigger(unittest2.TestCase):
@@ -298,24 +405,22 @@ class TestExecutor_MessageCountTrigger(unittest2.TestCase):
         options = BundleOptions(message_count_threshold=threshold)
         bundler = bundling.Executor(options)
         for i in range(threshold):
-            got_queue, got_canceller = bundler.schedule(
+            got_event = bundler.schedule(
                 api_call,
                 an_id,
-                'field1',
+                SIMPLE_DESCRIPTOR,
                 _Simple([a_msg])
             )
+            self.assertIsNotNone(
+                got_event.canceller,
+                'missing canceller after message #{}'.format(i))
             if i + 1 < threshold:
-                self.assertIsNotNone(
-                    got_canceller,
-                    'missing canceller after message #{}'.format(i))
-                self.assertEquals([], list(got_queue))
+                self.assertFalse(got_event.is_set())
+                self.assertIsNone(got_event.result)
             else:
-                self.assertIsNone(
-                    got_canceller,
-                    'expected None as canceller after message #{}'.format(i)
-                )
-                self.assertEquals([_Simple([a_msg] * threshold)],
-                                  list(got_queue))
+                self.assertTrue(got_event.is_set())
+                self.assertEquals(_Simple([a_msg] * threshold),
+                                  got_event.result)
 
 
 class TestExecutor_MessageByteSizeTrigger(unittest2.TestCase):
@@ -329,24 +434,22 @@ class TestExecutor_MessageByteSizeTrigger(unittest2.TestCase):
         options = BundleOptions(message_bytesize_threshold=threshold)
         bundler = bundling.Executor(options)
         for i in range(msgs_for_threshold):
-            got_queue, got_canceller = bundler.schedule(
+            got_event = bundler.schedule(
                 api_call,
                 an_id,
-                'field1',
+                SIMPLE_DESCRIPTOR,
                 _Simple([a_msg])
             )
+            self.assertIsNotNone(
+                got_event.canceller,
+                'missing canceller after message #{}'.format(i))
             if i + 1 < msgs_for_threshold:
-                self.assertIsNotNone(
-                    got_canceller,
-                    'missing canceller after message #{}'.format(i))
-                self.assertEquals([], list(got_queue))
+                self.assertFalse(got_event.is_set())
+                self.assertIsNone(got_event.result)
             else:
-                self.assertIsNone(
-                    got_canceller,
-                    'expected None as canceller after message #{}'.format(i)
-                )
-                self.assertEquals([_Simple([a_msg] * msgs_for_threshold)],
-                                  list(got_queue))
+                self.assertTrue(got_event.is_set())
+                self.assertEquals(_Simple([a_msg] * msgs_for_threshold),
+                                  got_event.result)
 
 
 class TestExecutor_DelayThreshold(unittest2.TestCase):
@@ -359,16 +462,51 @@ class TestExecutor_DelayThreshold(unittest2.TestCase):
         delay_threshold = 3
         options = BundleOptions(delay_threshold=delay_threshold)
         bundler = bundling.Executor(options)
-        got_queue, got_canceller = bundler.schedule(
+        got_event = bundler.schedule(
             api_call,
             an_id,
-            'field1',
+            SIMPLE_DESCRIPTOR,
             _Simple([a_msg])
         )
-        self.assertIsNotNone(got_canceller, 'missing canceller after first msg')
-        self.assertEquals([], list(got_queue))
+        self.assertIsNotNone(got_event, 'missing event after first msg')
+        self.assertIsNone(got_event.result)
         self.assertTrue(timer_class.called)
         timer_args, timer_kwargs = timer_class.call_args_list[0]
         self.assertEquals(delay_threshold, timer_args[0])
         self.assertEquals({'args': [an_id]}, timer_kwargs)
         timer_class.return_value.start.assert_called_once_with()
+
+
+class TestEvent(unittest2.TestCase):
+
+    def test_can_be_set(self):
+        ev = bundling.Event()
+        self.assertFalse(ev.is_set())
+        ev.set()
+        self.assertTrue(ev.is_set())
+
+    def test_can_be_cleared(self):
+        ev = bundling.Event()
+        ev.result = object()
+        ev.set()
+        self.assertTrue(ev.is_set())
+        self.assertIsNotNone(ev.result)
+        ev.clear()
+        self.assertFalse(ev.is_set())
+        self.assertIsNone(ev.result)
+
+    def test_cancel_returns_false_without_canceller(self):
+        ev = bundling.Event()
+        self.assertFalse(ev.cancel())
+
+    def test_cancel_returns_canceller_result(self):
+        ev = bundling.Event()
+        ev.canceller = lambda: True
+        self.assertTrue(ev.cancel())
+        ev.canceller = lambda: False
+        self.assertFalse(ev.cancel())
+
+    def test_wait_does_not_block_if_event_is_set(self):
+        ev = bundling.Event()
+        ev.set()
+        self.assertTrue(ev.wait())
