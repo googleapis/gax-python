@@ -64,7 +64,7 @@ class BundleDescriptor(
       request_descriminator_fields: a list of fields in the
         target request message class that are used to determine
         which messages should be bundled together.
-      subresponse_field: an optional field, when present it indicates field
+      subresponse_field: an optional field, when present it indicates the field
         in the response message that should be used to demultiplex the response
         into multiple response messages.
     """

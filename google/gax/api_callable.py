@@ -118,8 +118,7 @@ def _bundleable(a_func, desc, bundler):
     def inner(request):
         """Schedules execution of a bundling task."""
         the_id = bundling.compute_bundle_id(request, desc.discriminator_fields)
-        return bundler.schedule(a_func, the_id, desc.bundled_field, request,
-                                subresponse_field=desc.subresponse_field)
+        return bundler.schedule(a_func, the_id, desc, request)
 
     return inner
 
