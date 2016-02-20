@@ -190,7 +190,7 @@ class _Parser(object):
     t_EQUALS = r'='
     t_WILDCARD = r'\*'
     t_PATH_WILDCARD = r'\*\*'
-    t_LITERAL = r'[^/}{=\*]+'
+    t_LITERAL = r'[a-zA-Z0-9\._~-]+'
 
     t_ignore = ' \t'
 
@@ -199,7 +199,7 @@ class _Parser(object):
 
     def __init__(self):
         self.lexer = lex.lex(module=self)
-        self.parser = yacc.yacc(module=self, debug=0, write_tables=0)
+        self.parser = yacc.yacc(module=self, debug=False, write_tables=False)
 
     def parse(self, data):
         """Returns a list of path template segments parsed from data.
@@ -288,3 +288,8 @@ class _Parser(object):
                 'parser error: unexpected token \'%s\'' % p.type)
         else:
             raise ValidationException('parser error: unexpected EOF')
+
+    def t_error(self, t):
+        """Raises a lexer error."""
+        raise ValidationException(
+            'lexer error: illegal character \'%s\'' % t.value[0])
