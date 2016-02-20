@@ -42,6 +42,10 @@ class TestPathTemplate(unittest2.TestCase):
     def test_len(self):
         self.assertEqual(len(PathTemplate('a/b/**/*/{a=hello/world}')), 6)
 
+    def test_fail_invalid_token(self):
+        self.assertRaises(ValidationException,
+                          PathTemplate, 'hello/wor@ld')
+
     def test_fail_when_impossible_match(self):
         template = PathTemplate('hello/world')
         self.assertRaises(ValidationException,
@@ -119,5 +123,5 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual(str(template), 'buckets/{hello=*}')
         template = PathTemplate('/buckets/{hello=what}/{world}')
         self.assertEqual(str(template), 'buckets/{hello=what}/{world=*}')
-        template = PathTemplate('/buckets/hello?#$##:what')
-        self.assertEqual(str(template), 'buckets/hello?#$##:what')
+        template = PathTemplate('/buckets/helloazAZ09-.~_:what')
+        self.assertEqual(str(template), 'buckets/helloazAZ09-.~_:what')
