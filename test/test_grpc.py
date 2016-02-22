@@ -38,71 +38,87 @@ import unittest2
 from google.gax import grpc
 
 
-def _fake_create_stub(channel, metadata_transformer=None):
-    return channel, metadata_transformer
+def _fake_create_stub(channel):
+    return channel
 
 
 class TestCreateStub(unittest2.TestCase):
     FAKE_SERVICE_PATH = 'service_path'
     FAKE_PORT = 10101
 
-    @mock.patch('grpc.beta.implementations.ssl_client_credentials')
+    @mock.patch('grpc.beta.implementations.composite_channel_credentials')
+    @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
     @mock.patch('grpc.beta.implementations.secure_channel')
     @mock.patch('google.gax.auth.make_auth_func')
-    def test_creates_a_stub_ok_with_no_scopes(self, auth, chan, client_creds):
-        got_channel, got_func = grpc.create_stub(
+    def test_creates_a_stub_ok_with_no_scopes(
+            self, auth, chan, chan_creds, comp):
+        got_channel = grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT)
-        client_creds.assert_called_once_with(None, None, None)
+        chan_creds.assert_called_once_with(None, None, None)
         chan.assert_called_once_with(self.FAKE_SERVICE_PATH, self.FAKE_PORT,
-                                     client_creds.return_value)
+                                     comp.return_value)
         auth.assert_called_once_with([])
         self.assertEquals(got_channel, chan.return_value)
-        self.assertEquals(got_func, auth.return_value)
 
-    @mock.patch('grpc.beta.implementations.ssl_client_credentials')
+    @mock.patch('grpc.beta.implementations.composite_channel_credentials')
+    @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
     @mock.patch('grpc.beta.implementations.secure_channel')
     @mock.patch('google.gax.auth.make_auth_func')
-    def test_creates_a_stub_ok_with_scopes(self, auth, chan, client_creds):
+    def test_creates_a_stub_ok_with_scopes(
+            self, auth, chan, chan_creds, comp):
         fake_scopes = ['dummy', 'scopes']
         grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             scopes=fake_scopes)
-        client_creds.assert_called_once_with(None, None, None)
+        chan_creds.assert_called_once_with(None, None, None)
         chan.assert_called_once_with(self.FAKE_SERVICE_PATH, self.FAKE_PORT,
-                                     client_creds.return_value)
+                                     comp.return_value)
         auth.assert_called_once_with(fake_scopes)
 
-    @mock.patch('grpc.beta.implementations.ssl_client_credentials')
+    @mock.patch('grpc.beta.implementations.metadata_call_credentials')
+    @mock.patch('grpc.beta.implementations.composite_channel_credentials')
+    @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
     @mock.patch('grpc.beta.implementations.secure_channel')
     @mock.patch('google.gax.auth.make_auth_func')
-    def test_creates_a_stub_with_given_channel(self, auth, chan, client_creds):
+    def test_creates_a_stub_with_given_channel(
+            self, auth, chan, chan_creds, comp, md):
         fake_channel = object()
-        got_channel, _ = grpc.create_stub(
+        got_channel = grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             channel=fake_channel)
-        auth.assert_called_once_with([])
         self.assertEquals(got_channel, fake_channel)
-        self.assertFalse(client_creds.called)
+        self.assertFalse(auth.called)
+        self.assertFalse(chan_creds.called)
         self.assertFalse(chan.called)
+        self.assertFalse(comp.called)
+        self.assertFalse(md.called)
 
-    @mock.patch('grpc.beta.implementations.ssl_client_credentials')
+    @mock.patch('grpc.beta.implementations.metadata_call_credentials')
+    @mock.patch('grpc.beta.implementations.composite_channel_credentials')
+    @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
     @mock.patch('grpc.beta.implementations.secure_channel')
     @mock.patch('google.gax.auth.make_auth_func')
-    def test_creates_a_stub_ok_with_given_creds(self, dummy_auth, chan,
-                                                client_creds):
+    def test_creates_a_stub_ok_with_given_creds(self, auth, chan, chan_creds,
+                                                comp, md):
         fake_creds = object()
-        grpc.create_stub(
+        got_channel = grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             ssl_creds=fake_creds)
         chan.assert_called_once_with(self.FAKE_SERVICE_PATH, self.FAKE_PORT,
-                                     fake_creds)
-        self.assertFalse(client_creds.called)
+                                     comp.return_value)
+        auth.assert_called_once_with([])
+        self.assertTrue(chan.called)
+        self.assertFalse(chan_creds.called)
+        self.assertTrue(comp.called)
+        self.assertTrue(md.called)
+        self.assertEquals(got_channel, chan.return_value)
 
-    @mock.patch('grpc.beta.implementations.ssl_client_credentials')
+    @mock.patch('grpc.beta.implementations.composite_channel_credentials')
+    @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
     @mock.patch('grpc.beta.implementations.secure_channel')
     @mock.patch('google.gax.auth.make_auth_func')
     def test_creates_a_stub_ok_with_given_auth_func(self, auth, dummy_chan,
-                                                    dummy_client_creds):
+                                                    dummy_chan_creds, dummy_md):
         grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             metadata_transformer=lambda x: tuple())
