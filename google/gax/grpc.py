@@ -34,6 +34,23 @@ from grpc.beta import implementations
 from . import auth
 
 
+def _make_grpc_auth_func(auth_func):
+    """Creates the auth func expected by the grpc callback."""
+
+    def grpc_auth(dummy_context, callback):
+        """The auth signature required by grpc."""
+        callback(auth_func(), None)
+
+    return grpc_auth
+
+
+def _make_channel_creds(auth_func, ssl_creds):
+    """Converts the auth func into the composite creds expected by grpc."""
+    grpc_auth_func = _make_grpc_auth_func(auth_func)
+    call_creds = implementations.metadata_call_credentials(grpc_auth_func)
+    return implementations.composite_channel_credentials(ssl_creds, call_creds)
+
+
 def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
                 channel=None, metadata_transformer=None, scopes=None):
     """Creates a gRPC client stub.
@@ -54,14 +71,17 @@ def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
     Returns:
         A gRPC client stub.
     """
-    if scopes is None:
-        scopes = []
     if channel is None:
         if ssl_creds is None:
-            ssl_creds = implementations.ssl_client_credentials(None, None, None)
-        channel = implementations.secure_channel(service_path, port, ssl_creds)
-    if metadata_transformer is None:
-        metadata_transformer = auth.make_auth_func(scopes)
+            ssl_creds = implementations.ssl_channel_credentials(
+                None, None, None)
+        if metadata_transformer is None:
+            if scopes is None:
+                scopes = []
+            metadata_transformer = auth.make_auth_func(scopes)
 
-    return generated_create_stub(channel,
-                                 metadata_transformer=metadata_transformer)
+        channel_creds = _make_channel_creds(metadata_transformer, ssl_creds)
+        channel = implementations.secure_channel(
+            service_path, port, channel_creds)
+
+    return generated_create_stub(channel)

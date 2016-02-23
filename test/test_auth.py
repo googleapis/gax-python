@@ -51,6 +51,6 @@ class TestMakeAuthFunc(unittest2.TestCase):
         fake_scopes = ['fake', 'scopes']
         the_func = auth.make_auth_func(fake_scopes)
         factory.return_value.create_scoped.assert_called_once_with(fake_scopes)
-        got = the_func({})
+        got = the_func()
         want = [('authorization', 'Bearer an_auth_token')]
         self.assertEqual(got, want)

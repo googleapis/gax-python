@@ -39,7 +39,7 @@ def make_auth_func(scopes):
     google_creds = auth_client.GoogleCredentials.get_application_default()
     scoped_creds = google_creds.create_scoped(scopes)
 
-    def auth_func(dummy_headers):
+    def auth_func():
         """Adds the access token from the creds as the authorization token."""
         authn = scoped_creds.get_access_token().access_token
         return [
