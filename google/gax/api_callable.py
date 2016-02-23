@@ -161,7 +161,7 @@ class ApiCallDefaults(object):
     """Encapsulates the default settings for all ApiCallables in an API"""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, is_idempotent_retrying=True,
-                 max_attempts=16, bundle_options=None, bundler=None):
+                 max_attempts=16, bundler=None):
         """Constructor.
 
         Args:
@@ -171,7 +171,6 @@ class ApiCallDefaults(object):
                 by default.
             max_attempts (int): The maximum number of attempts that should be
                 made for a retrying call to this service.
-            bundle_options (BundleOptions): (optional) configures bundling
             bundler (bundle.Executor): (optional) orchestrates bundling
 
         Returns:
@@ -180,7 +179,6 @@ class ApiCallDefaults(object):
         self.timeout = timeout
         self.is_idempotent_retrying = is_idempotent_retrying
         self.max_attempts = max_attempts
-        self.bundle_options = bundle_options
         self.bundler = bundler
 
 
@@ -188,7 +186,9 @@ class CallOptions(object):
     """Encapsulates the default settings for a particular API call"""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, is_retrying=OPTION_INHERIT,
-                 max_attempts=OPTION_INHERIT, page_streaming=OPTION_INHERIT):
+                 max_attempts=OPTION_INHERIT, page_streaming=OPTION_INHERIT,
+                 bundle_descriptor=OPTION_INHERIT,
+                 bundle_options=OPTION_INHERIT):
         """Constructor.
 
         Args:
@@ -197,9 +197,15 @@ class CallOptions(object):
                 default.
             max_attempts: The maximum number of attempts that should be made
                 for a retrying call to this service.
-            page_streaming: page_descriptor.PageDescriptor indicating the
-                structure of page streaming to be performed. If set to None
-                no page streaming is performed.
+            page_streaming (PageDescriptor): indicates the structure of page
+                streaming to be performed. If set to None, no page streaming
+                is performed.
+            bundle_descriptor (BundleDescriptor): indicates the structure of
+                bundling to be performed. Both ``bundle_descriptor`` and
+                ``bundle_options`` must be set if bundling is to be performed.
+            bundle_options (BundleOptions): configures bundling thresholds.
+                Both ``bundle_descriptor`` and ``bundle options`` must be set
+                if bundling is to be performed.
 
         Returns:
             A CallOptions object.
@@ -208,6 +214,8 @@ class CallOptions(object):
         self.is_retrying = is_retrying
         self.max_attempts = max_attempts
         self.page_streaming = page_streaming
+        self.bundle_descriptor = bundle_descriptor
+        self.bundle_options = bundle_options
 
     def update(self, options):
         """Merges another CallOptions object into this one.
@@ -226,6 +234,10 @@ class CallOptions(object):
             self.max_attempts = options.max_attempts
         if options.page_streaming != OPTION_INHERIT:
             self.page_streaming = options.page_streaming
+        if options.bundle_descriptor != OPTION_INHERIT:
+            self.bundle_descriptor = options.bundle_descriptor
+        if options.bundle_options != OPTION_INHERIT:
+            self.bundle_options = options.bundle_options
 
     def normalize(self):
         """Transforms fields set to OPTION_INHERIT to None."""
@@ -237,6 +249,10 @@ class CallOptions(object):
             self.max_attempts = None
         if self.page_streaming == OPTION_INHERIT:
             self.page_streaming = None
+        if options.bundle_descriptor == OPTION_INHERIT:
+            self.bundle_descriptor = None
+        if options.bundle_options == OPTION_INHERIT:
+            self.bundle_options = None
 
 
 class ApiCallable(object):
