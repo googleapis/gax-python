@@ -249,9 +249,9 @@ class CallOptions(object):
             self.max_attempts = None
         if self.page_streaming == OPTION_INHERIT:
             self.page_streaming = None
-        if options.bundle_descriptor == OPTION_INHERIT:
+        if self.bundle_descriptor == OPTION_INHERIT:
             self.bundle_descriptor = None
-        if options.bundle_options == OPTION_INHERIT:
+        if self.bundle_options == OPTION_INHERIT:
             self.bundle_options = None
 
 
