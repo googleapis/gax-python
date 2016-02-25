@@ -3,14 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Google API eXtensions
-=====================
 
-This is the API documentation for ``google-gax``, a support library for use with
-the python client libraries generated from the published protobuf IDL, e.g, the
-published `Google APIs`_.
+.. toctree::
+   :maxdepth: 2
+   :caption: Google APIs Extensions
 
-Contents:
+This is the API documentation for Google API Extensions for Python (gax-python),
+a set of libraries which aids the development of APIs for clients and servers
+based on `GRPC`_ and `Google APIs`_ conventions.
+
 
 .. autosummary::
    :toctree: generated
@@ -32,4 +33,5 @@ Indices and tables
 * :ref:`search`
 
 
-.. _`Google APIs`: https://github.com/google/googleapis/
+.. _`GRPC`: http://grpc.io
+.. _`Google APIs`: https://github.com/googleapis/googleapis/
