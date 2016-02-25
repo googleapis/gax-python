@@ -1,6 +1,16 @@
 Google API Extensions for Python
 ================================
 
+.. image:: https://img.shields.io/travis/googleapis/gax-python.svg
+     :target: https://travis-ci.org/googleapis/gax-python
+
+.. image:: https://img.shields.io/pypi/dw/google-gax.svg
+     :target: https://pypi.python.org/pypi/google-gax
+
+.. image:: https://readthedocs.org/projects/google-gax/badge/?version=latest
+     :target: http://google-gax.readthedocs.org/
+
+
 Google API Extensions for Python (gax-python) is a set of modules which aids the
 development of APIs for clients and servers based on `gRPC`_ and Google API
 conventions.
