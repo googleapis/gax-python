@@ -82,6 +82,11 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual({'hello': 'world'},
                          template.match('buckets/world'))
 
+    def test_match_escaped_chars(self):
+        template = PathTemplate('buckets/*/objects')
+        self.assertEqual({'$0': 'hello%2F%2Bworld'},
+                         template.match('buckets/hello%2F%2Bworld/objects'))
+
     def test_match_template_with_unbounded_wildcard(self):
         template = PathTemplate('buckets/*/objects/**')
         self.assertEqual({'$0': 'foo', '$1': 'bar/baz'},
