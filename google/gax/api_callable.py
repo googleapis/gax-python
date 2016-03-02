@@ -29,17 +29,9 @@
 
 """Provides function wrappers that implement page streaming and retrying."""
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
-from . import bundling, config
-
-
-OPTION_INHERIT = object()
-"""Global constant.
-
-If a CallOptions field is set to OPTION_INHERIT, the call to which that
-CallOptions belongs will attempt to inherit that field from its default
-settings."""
+from . import bundling
 
 
 def _add_timeout_arg(a_func, timeout):
@@ -66,18 +58,22 @@ def _add_timeout_arg(a_func, timeout):
     return inner
 
 
-def _retryable(a_func, max_attempts):
+def _retryable(a_func, retry):
     """Creates a function equivalent to a_func, but that retries on certain
     exceptions.
 
     Args:
         a_func (callable): A callable.
-        max_attempts (int): The maximum number of times that the call should
-            be attempted; the call will always be attempted at least once.
+        retry (RetryOptions): Configures the exceptions upon which the callable
+          should retry, and the parameters to the exponential backoff retry
+          algorithm.
 
     Returns:
         A function that will retry on exception.
     """
+
+    max_attempts = int(retry.backoff_settings.total_timeout_millis /
+                       retry.backoff_settings.initial_rpc_timeout_millis)
 
     def inner(*args, **kwargs):
         "Retries a_func upto max_attempt times"
@@ -85,7 +81,8 @@ def _retryable(a_func, max_attempts):
         while 1:
             try:
                 return a_func(*args, **kwargs)
-            except config.RETRY_EXCEPTIONS:
+            # pylint: disable=catching-non-exception
+            except tuple(retry.retry_codes):
                 attempt_count += 1
                 if attempt_count < max_attempts:
                     continue
@@ -158,106 +155,6 @@ def _page_streamable(a_func,
     return inner
 
 
-class CallSettings(object):
-    """Encapsulates the call settings for an ApiCallable"""
-    # pylint: disable=too-few-public-methods
-    def __init__(self, timeout=30, is_retrying=False, max_attempts=16,
-                 page_descriptor=None, bundler=None, bundle_descriptor=None):
-        """Constructor.
-
-        Args:
-            timeout (int): The client-side timeout for API calls.
-            is_retrying (bool): If set, calls will retry upon transient error
-                by default.
-            max_attempts (int): The maximum number of attempts that should be
-                made for a retrying call to this service. This parameter is
-                ignored if ``is_retrying`` is not set.
-            page_descriptor (PageDescriptor): indicates the structure of page
-                streaming to be performed. If set to None, page streaming is
-                not performed.
-            bundler (bundle.Executor): orchestrates bundling. If None, bundling
-                is not performed.
-            bundle_descriptor (BundleDescriptor): indicates the structure of
-                the bundle. If None, bundling is not performed.
-
-        Returns:
-            A CallSettings object.
-        """
-        self.timeout = timeout
-        self.is_retrying = is_retrying
-        self.max_attempts = max_attempts
-        self.page_descriptor = page_descriptor
-        self.bundler = bundler
-        self.bundle_descriptor = bundle_descriptor
-
-    def merge(self, options):
-        """Returns a new CallSettings merged from this and a CallOptions object.
-
-        Args:
-            options: A CallOptions object whose values are override those in
-                this object. If None, `merge` returns a copy of this object.
-
-        Returns:
-            A CallSettings object.
-        """
-        if not options:
-            return CallSettings(
-                timeout=self.timeout, is_retrying=self.is_retrying,
-                max_attempts=self.max_attempts,
-                page_descriptor=self.page_descriptor,
-                bundler=self.bundler, bundle_descriptor=self.bundle_descriptor)
-        else:
-            if options.timeout == OPTION_INHERIT:
-                timeout = self.timeout
-            else:
-                timeout = options.timeout
-
-            if options.is_retrying == OPTION_INHERIT:
-                is_retrying = self.is_retrying
-            else:
-                is_retrying = options.is_retrying
-
-            if options.max_attempts == OPTION_INHERIT:
-                max_attempts = self.max_attempts
-            else:
-                max_attempts = options.max_attempts
-
-            if options.is_page_streaming:
-                page_descriptor = self.page_descriptor
-            else:
-                page_descriptor = None
-
-            return CallSettings(
-                timeout=timeout, is_retrying=is_retrying,
-                max_attempts=max_attempts, page_descriptor=page_descriptor,
-                bundler=self.bundler, bundle_descriptor=self.bundle_descriptor)
-
-
-class CallOptions(object):
-    """Encapsulates the overridable settings for a particular API call"""
-    # pylint: disable=too-few-public-methods
-    def __init__(self, timeout=OPTION_INHERIT, is_retrying=OPTION_INHERIT,
-                 max_attempts=OPTION_INHERIT, is_page_streaming=OPTION_INHERIT):
-        """Constructor.
-
-        Args:
-            timeout (int): The client-side timeout for API calls.
-            is_retrying (bool): If set, call will retry upon transient error by
-                default.
-            max_attempts (int): The maximum number of attempts that should be
-                made for a retrying call to this service.
-            is_page_streaming (bool): If set and the call is
-                configured for page streaming, page streaming is performed.
-
-        Returns:
-            A CallOptions object.
-        """
-        self.timeout = timeout
-        self.is_retrying = is_retrying
-        self.max_attempts = max_attempts
-        self.is_page_streaming = is_page_streaming
-
-
 class ApiCallable(object):
     """Represents zero or more API calls, with options to retry or perform
     page streaming.
@@ -270,7 +167,7 @@ class ApiCallable(object):
 
         Args:
             func: The API call that this ApiCallable wraps.
-            settings: A CallSettings object from which the settings for this
+            settings: A gax.CallSettings object from which the settings for this
                 call are drawn.
 
         Returns:
@@ -284,8 +181,8 @@ class ApiCallable(object):
 
         # Update the_func using each of the applicable function decorators
         # before calling.
-        if self.settings.is_retrying:
-            the_func = _retryable(the_func, self.settings.max_attempts)
+        if self.settings.retry:
+            the_func = _retryable(the_func, self.settings.retry)
         if self.settings.page_descriptor:
             if self.settings.bundler and self.settings.bundle_descriptor:
                 raise ValueError('ApiCallable has incompatible settings: '

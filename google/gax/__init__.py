@@ -33,7 +33,103 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.4.1'
+__version__ = '0.5.0'
+
+
+OPTION_INHERIT = object()
+"""Global constant.
+
+If a CallOptions field is set to OPTION_INHERIT, the call to which that
+CallOptions belongs will attempt to inherit that field from its default
+settings."""
+
+
+class CallSettings(object):
+    """Encapsulates the call settings for an ApiCallable"""
+    # pylint: disable=too-few-public-methods
+    def __init__(self, timeout=30, retry=None, page_descriptor=None,
+                 bundler=None, bundle_descriptor=None):
+        """Constructor.
+
+        Args:
+            timeout (int): The client-side timeout for API calls. This
+              parameter is ignored for retrying calls.
+            retry (RetryOptions): The configuration for retrying upon transient
+              error. If set to None, this call will not retry.
+            page_descriptor (PageDescriptor): indicates the structure of page
+              streaming to be performed. If set to None, page streaming is
+              not performed.
+            bundler (bundle.Executor): orchestrates bundling. If None, bundling
+              is not performed.
+            bundle_descriptor (BundleDescriptor): indicates the structure of
+              the bundle. If None, bundling is not performed.
+
+        Returns:
+            A CallSettings object.
+        """
+        self.timeout = timeout
+        self.retry = retry
+        self.page_descriptor = page_descriptor
+        self.bundler = bundler
+        self.bundle_descriptor = bundle_descriptor
+
+    def merge(self, options):
+        """Returns a new CallSettings merged from this and a CallOptions object.
+
+        Args:
+            options: A CallOptions object whose values are override those in
+              this object. If None, `merge` returns a copy of this object.
+
+        Returns:
+            A CallSettings object.
+        """
+        if not options:
+            return CallSettings(
+                timeout=self.timeout, retry=self.retry,
+                page_descriptor=self.page_descriptor, bundler=self.bundler,
+                bundle_descriptor=self.bundle_descriptor)
+        else:
+            if options.timeout == OPTION_INHERIT:
+                timeout = self.timeout
+            else:
+                timeout = options.timeout
+
+            if options.retry == OPTION_INHERIT:
+                retry = self.retry
+            else:
+                retry = options.retry
+
+            if options.is_page_streaming:
+                page_descriptor = self.page_descriptor
+            else:
+                page_descriptor = None
+
+            return CallSettings(
+                timeout=timeout, retry=retry,
+                page_descriptor=page_descriptor, bundler=self.bundler,
+                bundle_descriptor=self.bundle_descriptor)
+
+
+class CallOptions(object):
+    """Encapsulates the overridable settings for a particular API call"""
+    # pylint: disable=too-few-public-methods
+    def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
+                 is_page_streaming=OPTION_INHERIT):
+        """Constructor.
+
+        Args:
+            timeout (int): The client-side timeout for API calls.
+            retry (RetryOptions): The configuration for retrying upon transient error.
+              If set to None, this call will not retry.
+            is_page_streaming (bool): If set and the call is configured for page
+              streaming, page streaming is performed.
+
+        Returns:
+            A CallOptions object.
+        """
+        self.timeout = timeout
+        self.retry = retry
+        self.is_page_streaming = is_page_streaming
 
 
 class PageDescriptor(
@@ -43,6 +139,56 @@ class PageDescriptor(
              'response_page_token_field',
              'resource_field'])):
     """Describes the structure of a page-streaming call."""
+    pass
+
+
+class RetryOptions(
+        collections.namedtuple(
+            'RetryOptions',
+            ['retry_codes',
+             'backoff_settings'])):
+    """Per-call configurable settings for retrying upon transient failure.
+
+    Attributes:
+      retry_codes: a list of exceptions upon which a retry should be attempted.
+      backoff_settings: a BackoffSettings object configuring the retry
+        exponential backoff algorithm.
+    """
+    pass
+
+
+class BackoffSettings(
+        collections.namedtuple(
+            'BackoffSettings',
+            ['initial_retry_delay_millis',
+             'retry_delay_multiplier',
+             'max_retry_delay_millis',
+             'initial_rpc_timeout_millis',
+             'rpc_timeout_multiplier',
+             'max_rpc_timeout_millis',
+             'total_timeout_millis'])):
+    """Parameters to the exponential backoff algorithm for retrying.
+
+    Attributes:
+      initial_retry_delay_millis: the initial delay time, in milliseconds,
+        between the completion of the first failed request and the initiation of
+        the first retrying request.
+      retry_delay_multiplier: the multiplier by which to increase the delay time
+        between the completion of failed requests, and the initiation of the
+        subsequent retrying request.
+      max_retry_delay_millis: the maximum delay time, in milliseconds, between
+        requests. When this value is reached, ``retry_delay_multiplier`` will no
+        longer be used to increase delay time.
+      initial_rpc_timeout_millis: the initial timeout parameter to the request.
+      rpc_timeout_multiplier: the multiplier by which to increase the timeout
+        parameter between failed requests.
+      max_rpc_timeout_millis: the maximum timeout parameter, in milliseconds,
+        for a request. When this value is reached, ``rpc_timeout_multiplier``
+        will no longer be used to increase the timeout.
+      total_timeout_millis: the total time, in milliseconds, starting from when
+        the initial request is sent, after which an error will be returned,
+        regardless of the retrying attempts made meanwhile.
+    """
     pass
 
 

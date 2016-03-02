@@ -34,7 +34,8 @@ from __future__ import absolute_import
 
 import unittest2
 
-from google.gax import BundleOptions
+from google.gax import (
+    BundleOptions, CallOptions, CallSettings, OPTION_INHERIT, RetryOptions)
 
 
 class TestBundleOptions(unittest2.TestCase):
@@ -54,3 +55,50 @@ class TestBundleOptions(unittest2.TestCase):
         self.assertRaises(AssertionError,
                           BundleOptions,
                           delay_threshold=not_an_int)
+
+
+class TestCallSettings(unittest2.TestCase):
+
+    def test_call_options_simple(self):
+        options = CallOptions(timeout=23)
+        self.assertEqual(options.timeout, 23)
+        self.assertEqual(options.retry, OPTION_INHERIT)
+        self.assertEqual(options.is_page_streaming, OPTION_INHERIT)
+
+    def test_settings_merge_options1(self):
+        retry = RetryOptions(None, None)
+        options = CallOptions(timeout=46, retry=retry)
+        settings = CallSettings(timeout=9, page_descriptor=None, retry=None)
+        final = settings.merge(options)
+        self.assertEqual(final.timeout, 46)
+        self.assertEqual(final.retry, retry)
+        self.assertIsNone(final.page_descriptor)
+
+    def test_settings_merge_options2(self):
+        options = CallOptions(retry=None)
+        settings = CallSettings(
+            timeout=9, page_descriptor=None, retry=RetryOptions(None, None))
+        final = settings.merge(options)
+        self.assertEqual(final.timeout, 9)
+        self.assertIsNone(final.page_descriptor)
+        self.assertIsNone(final.retry)
+
+    def test_settings_merge_options_page_streaming(self):
+        retry = RetryOptions(None, None)
+        options = CallOptions(timeout=46, is_page_streaming=False)
+        settings = CallSettings(timeout=9, retry=retry)
+        final = settings.merge(options)
+        self.assertEqual(final.timeout, 46)
+        self.assertIsNone(final.page_descriptor)
+        self.assertEqual(final.retry, retry)
+
+    def test_settings_merge_none(self):
+        settings = CallSettings(
+            timeout=23, page_descriptor=object(), bundler=object(),
+            retry=object())
+        final = settings.merge(None)
+        self.assertEqual(final.timeout, settings.timeout)
+        self.assertEqual(final.retry, settings.retry)
+        self.assertEqual(final.page_descriptor, settings.page_descriptor)
+        self.assertEqual(final.bundler, settings.bundler)
+        self.assertEqual(final.bundle_descriptor, settings.bundle_descriptor)

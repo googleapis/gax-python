@@ -34,42 +34,50 @@ from __future__ import absolute_import
 import mock
 import unittest2
 
-from google.gax import (api_callable, bundling, PageDescriptor,
-                        BundleDescriptor, BundleOptions)
+from google.gax import (
+    api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
+    CallSettings, PageDescriptor, RetryOptions)
 from grpc.framework.interfaces.face import face
 
-_DUMMY_ERROR = face.AbortionError(None, None, None, None)
+
+_DUMMY_ERROR_TYPE = face.AbortionError
+_DUMMY_ERROR_INSTANCE = _DUMMY_ERROR_TYPE(None, None, None, None)
 
 
 class TestApiCallable(unittest2.TestCase):
 
     def test_call_api_callable(self):
-        settings = api_callable.CallSettings()
+        settings = CallSettings()
         my_callable = api_callable.ApiCallable(
             lambda _req, _timeout: 42, settings)
         self.assertEqual(my_callable(None), 42)
 
     def test_retry(self):
         to_attempt = 3
+        retry = RetryOptions(
+            [_DUMMY_ERROR_TYPE],
+            BackoffSettings(None, None, None, 1, None, None, to_attempt))
+
         # Succeeds on the to_attempt'th call, and never again afterward
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = ([_DUMMY_ERROR] * (to_attempt - 1) +
-                                     [mock.DEFAULT])
+            mock_grpc.side_effect = ([_DUMMY_ERROR_INSTANCE] *
+                                     (to_attempt - 1) + [mock.DEFAULT])
             mock_grpc.return_value = 1729
-            settings = api_callable.CallSettings(
-                timeout=0, is_retrying=True, max_attempts=to_attempt)
+            settings = CallSettings(timeout=0, retry=retry)
             my_callable = api_callable.ApiCallable(mock_grpc, settings)
             self.assertEqual(my_callable(None), 1729)
             self.assertEqual(mock_grpc.call_count, to_attempt)
 
     def test_retry_aborts(self):
         to_attempt = 3
+        retry = RetryOptions(
+            [_DUMMY_ERROR_TYPE],
+            BackoffSettings(None, None, None, 1, None, None, to_attempt))
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = _DUMMY_ERROR
-            settings = api_callable.CallSettings(
-                timeout=0, is_retrying=True, max_attempts=to_attempt)
+            mock_grpc.side_effect = _DUMMY_ERROR_INSTANCE
+            settings = CallSettings(timeout=0, retry=retry)
             my_callable = api_callable.ApiCallable(mock_grpc, settings)
             self.assertRaises(face.AbortionError, my_callable, None)
             self.assertEqual(mock_grpc.call_count, to_attempt)
@@ -111,14 +119,14 @@ class TestApiCallable(unittest2.TestCase):
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
             mock_grpc.side_effect = grpc_return_value
-            settings = api_callable.CallSettings(
+            settings = CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0)
             my_callable = api_callable.ApiCallable(mock_grpc, settings=settings)
             self.assertEqual(list(my_callable(PageStreamingRequest())),
                              list(range(page_size * pages_to_stream)))
 
     def test_bundling_page_streaming_error(self):
-        settings = api_callable.CallSettings(
+        settings = CallSettings(
             page_descriptor=object(), bundle_descriptor=object(),
             bundler=object())
         my_callable = api_callable.ApiCallable(
@@ -138,7 +146,7 @@ class TestApiCallable(unittest2.TestCase):
         def my_func(request, dummy_timeout):
             return len(request.messages)
 
-        settings = api_callable.CallSettings(
+        settings = CallSettings(
             bundler=bundler, bundle_descriptor=fake_grpc_func_descriptor,
             timeout=0)
         my_callable = api_callable.ApiCallable(my_func, settings)
@@ -147,50 +155,3 @@ class TestApiCallable(unittest2.TestCase):
         self.assertIsNone(first.result)  # pylint: disable=no-member
         second = my_callable(BundlingRequest([0] * 5))
         self.assertEquals(second.result, 8)  # pylint: disable=no-member
-
-    def test_call_options_simple(self):
-        options = api_callable.CallOptions(timeout=23, is_retrying=True)
-        self.assertEqual(options.timeout, 23)
-        self.assertTrue(options.is_retrying)
-        self.assertEqual(options.is_page_streaming, api_callable.OPTION_INHERIT)
-        self.assertEqual(options.max_attempts, api_callable.OPTION_INHERIT)
-
-    def test_settings_merge_options1(self):
-        options = api_callable.CallOptions(timeout=46, is_retrying=True)
-        settings = api_callable.CallSettings(
-            timeout=9, page_descriptor=None, max_attempts=16)
-        final = settings.merge(options)
-        self.assertEqual(final.timeout, 46)
-        self.assertTrue(final.is_retrying)
-        self.assertIsNone(final.page_descriptor)
-        self.assertEqual(final.max_attempts, 16)
-
-    def test_settings_merge_options2(self):
-        options = api_callable.CallOptions(max_attempts=1)
-        settings = api_callable.CallSettings(
-            timeout=9, page_descriptor=None, max_attempts=16)
-        final = settings.merge(options)
-        self.assertEqual(final.timeout, 9)
-        self.assertFalse(final.is_retrying)
-        self.assertIsNone(final.page_descriptor)
-        self.assertEqual(final.max_attempts, 1)
-
-    def test_settings_merge_options_page_streaming(self):
-        options = api_callable.CallOptions(timeout=46, is_page_streaming=False)
-        settings = api_callable.CallSettings(timeout=9, max_attempts=16)
-        final = settings.merge(options)
-        self.assertEqual(final.timeout, 46)
-        self.assertFalse(final.is_retrying)
-        self.assertIsNone(final.page_descriptor)
-        self.assertEqual(final.max_attempts, 16)
-
-    def test_settings_merge_none(self):
-        settings = api_callable.CallSettings(
-            timeout=23, page_descriptor=object(), bundler=object())
-        final = settings.merge(None)
-        self.assertEqual(final.timeout, settings.timeout)
-        self.assertEqual(final.is_retrying, settings.is_retrying)
-        self.assertEqual(final.max_attempts, settings.max_attempts)
-        self.assertEqual(final.page_descriptor, settings.page_descriptor)
-        self.assertEqual(final.bundler, settings.bundler)
-        self.assertEqual(final.bundle_descriptor, settings.bundle_descriptor)
