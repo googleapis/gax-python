@@ -190,7 +190,7 @@ class _Parser(object):
     t_EQUALS = r'='
     t_WILDCARD = r'\*'
     t_PATH_WILDCARD = r'\*\*'
-    t_LITERAL = r'[a-zA-Z0-9\._~-]+'
+    t_LITERAL = r'[a-zA-Z0-9\._~%-]+'
 
     t_ignore = ' \t'
 
