@@ -34,13 +34,25 @@ from __future__ import absolute_import
 from grpc.framework.interfaces.face import face
 from . import grpc
 
-# This defaults to checking for grpc AbortionErrors.
-#
-# TODO Determine which (if not all) we want to catch.
-# If necessary, ask Python gRPC to distinguish exception classes.
 
-RETRY_EXCEPTIONS = (face.AbortionError,)
-"""Exceptions that will trigger a retry."""
+# TODO: Determine which exceptions we support.
+EXCEPTION_NAMES = {
+    'ABORTED': face.AbortionError,
+    'CANCELLED': face.CancellationError,
+    'DATA_LOSS': face.NetworkError,
+    'DEADLINE_EXCEEDED': face.ExpirationError,
+    'FAILED_PRECONDITION': face.AbortionError,
+    'INTERNAL': face.AbortionError,
+    'INVALID_ARGUMENT': face.AbortionError,
+    'NOT_FOUND': face.AbortionError,
+    'OUT_OF_RANGE': face.AbortionError,
+    'PERMISSION_DENIED': face.AbortionError,
+    'RESOURCE_EXHAUSTED': face.AbortionError,
+    'UNAUTHENTICATED': face.AbortionError,
+    'UNAVAILABLE': face.AbortionError,
+    'UNIMPLEMENTED': face.AbortionError,
+    'UNKNOWN': face.AbortionError}
+
 
 create_stub = grpc.create_stub  # pylint: disable=invalid-name
 """The function to use to create stubs."""

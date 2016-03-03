@@ -37,11 +37,54 @@ import unittest2
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
     CallSettings, PageDescriptor, RetryOptions)
-from grpc.framework.interfaces.face import face
 
 
-_DUMMY_ERROR_TYPE = face.AbortionError
-_DUMMY_ERROR_INSTANCE = _DUMMY_ERROR_TYPE(None, None, None, None)
+_CONFIG = {
+    'retry_codes_def': [
+        {
+            'name': 'foo_retry',
+            'retry_codes': ['code_a', 'code_b']
+        },
+        {
+            'name': 'bar_retry',
+            'retry_codes': ['code_c']
+        }],
+    'retry_params': [
+        {
+            'name': 'default',
+            'initial_retry_delay_millis': 100,
+            'retry_delay_multiplier': 1.2,
+            'max_retry_delay_millis': 1000,
+            'initial_rpc_timeout_millis': 300,
+            'rpc_timeout_multiplier': 1.3,
+            'max_rpc_timeout_millis': 3000,
+            'total_timeout_millis': 30000
+        }],
+    'methods': [
+        {
+            'name': 'bundling_method',
+            'retry_codes_name': 'foo_retry',
+            'retry_params_name': 'default',
+            'bundle_options': {
+                'message_count_threshold': 6},
+            'bundle_descriptor': {
+                'bundled_field': 'abc',
+                'request_discriminator_fields': []}
+        },
+        {
+            'name': 'page_streaming_method',
+            'retry_codes_name': 'bar_retry',
+            'retry_params_name': 'default',
+            'page_streaming': {
+                'request': {
+                    'token_field': 'page_token'},
+                'response': {
+                    'token_field': 'next_page_token',
+                    'resources_field': 'page_streams'}}
+        }]}
+_RETRY_DICT = {'code_a': Exception,
+               'code_b': Exception,
+               'code_c': Exception}
 
 
 class TestApiCallable(unittest2.TestCase):
@@ -55,14 +98,14 @@ class TestApiCallable(unittest2.TestCase):
     def test_retry(self):
         to_attempt = 3
         retry = RetryOptions(
-            [_DUMMY_ERROR_TYPE],
+            [Exception],
             BackoffSettings(None, None, None, 1, None, None, to_attempt))
 
         # Succeeds on the to_attempt'th call, and never again afterward
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = ([_DUMMY_ERROR_INSTANCE] *
-                                     (to_attempt - 1) + [mock.DEFAULT])
+            mock_grpc.side_effect = (
+                [Exception] * (to_attempt - 1) + [mock.DEFAULT])
             mock_grpc.return_value = 1729
             settings = CallSettings(timeout=0, retry=retry)
             my_callable = api_callable.ApiCallable(mock_grpc, settings)
@@ -72,14 +115,14 @@ class TestApiCallable(unittest2.TestCase):
     def test_retry_aborts(self):
         to_attempt = 3
         retry = RetryOptions(
-            [_DUMMY_ERROR_TYPE],
+            [Exception],
             BackoffSettings(None, None, None, 1, None, None, to_attempt))
         with mock.patch('grpc.framework.crust.implementations.'
                         '_UnaryUnaryMultiCallable') as mock_grpc:
-            mock_grpc.side_effect = _DUMMY_ERROR_INSTANCE
+            mock_grpc.side_effect = Exception
             settings = CallSettings(timeout=0, retry=retry)
             my_callable = api_callable.ApiCallable(mock_grpc, settings)
-            self.assertRaises(face.AbortionError, my_callable, None)
+            self.assertRaises(Exception, my_callable, None)
             self.assertEqual(mock_grpc.call_count, to_attempt)
 
     def test_page_streaming(self):
@@ -155,3 +198,33 @@ class TestApiCallable(unittest2.TestCase):
         self.assertIsNone(first.result)  # pylint: disable=no-member
         second = my_callable(BundlingRequest([0] * 5))
         self.assertEquals(second.result, 8)  # pylint: disable=no-member
+
+    def test_construct_settings(self):
+        defaults = api_callable.construct_settings(
+            _CONFIG, dict(), dict(), _RETRY_DICT, 30)
+        settings = defaults['bundling_method']
+        self.assertEquals(settings.timeout, 30)
+        self.assertIsInstance(settings.bundler, bundling.Executor)
+        self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
+        self.assertIsNone(settings.page_descriptor)
+        self.assertIsInstance(settings.retry, RetryOptions)
+        settings = defaults['page_streaming_method']
+        self.assertEquals(settings.timeout, 30)
+        self.assertIsNone(settings.bundler)
+        self.assertIsNone(settings.bundle_descriptor)
+        self.assertIsInstance(settings.page_descriptor, PageDescriptor)
+        self.assertIsInstance(settings.retry, RetryOptions)
+
+    def test_construct_settings_override(self):
+        _bundling_override = {'bundling_method': None}
+        _retry_override = {'page_streaming_method': None}
+        defaults = api_callable.construct_settings(
+            _CONFIG, _bundling_override, _retry_override, _RETRY_DICT, 30)
+        settings = defaults['bundling_method']
+        self.assertEquals(settings.timeout, 30)
+        self.assertIsNone(settings.bundler)
+        self.assertIsNone(settings.page_descriptor)
+        settings = defaults['page_streaming_method']
+        self.assertEquals(settings.timeout, 30)
+        self.assertIsInstance(settings.page_descriptor, PageDescriptor)
+        self.assertIsNone(settings.retry)

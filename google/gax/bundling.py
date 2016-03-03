@@ -74,30 +74,30 @@ def _str_dotted_getattr(obj, name):
     return str(obj) if obj is not None else None
 
 
-def compute_bundle_id(obj, descriminator_fields):
-    """Computes a bundle id from the descriminator fields of `obj`.
+def compute_bundle_id(obj, discriminator_fields):
+    """Computes a bundle id from the discriminator fields of `obj`.
 
-    descriminator_fields may include '.' as a separator, which is used to
+    discriminator_fields may include '.' as a separator, which is used to
     indicate object traversal.  This is meant to allow fields in the
     computed bundle_id.
 
-    the id is a tuple computed by going through the descriminator fields in
+    the id is a tuple computed by going through the discriminator fields in
     order and obtaining the str(value) object field (or nested object field)
 
-    if any descriminator field cannot be found, ValueError is raised.
+    if any discriminator field cannot be found, ValueError is raised.
 
     Args:
       obj: an object
-      descriminator_fields: a list of descriminator fields in the order to be
+      discriminator_fields: a list of discriminator fields in the order to be
         to be used in the id
 
     Returns:
       tuple: computed as described above
 
     Raises:
-      AttributeError: if any descriminator fields attribute does not exist
+      AttributeError: if any discriminator fields attribute does not exist
     """
-    return tuple(_str_dotted_getattr(obj, x) for x in descriminator_fields)
+    return tuple(_str_dotted_getattr(obj, x) for x in discriminator_fields)
 
 
 _WARN_DEMUX_MISMATCH = ('cannot demultiplex the bundled response, got'
