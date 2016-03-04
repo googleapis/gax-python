@@ -142,10 +142,11 @@ def _page_streamable(a_func,
     """
     with_timeout = _add_timeout_arg(a_func, timeout)
 
-    def inner(request):
+    def inner(*args, **kwargs):
         """A generator that yields all the paged responses."""
+        request = args[0]
         while True:
-            response = with_timeout(request)
+            response = with_timeout(request, **kwargs)
             for obj in getattr(response, resource_field):
                 yield obj
             next_page_token = getattr(response, response_page_token_field)
