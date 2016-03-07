@@ -31,15 +31,12 @@
 
 from __future__ import absolute_import
 from collections import namedtuple
-import re
 
 from ply import lex, yacc
 
-_CUSTOM_VERB_PATTERN = re.compile(':([^/*}{=]+)$')
 _BINDING = 1
 _END_BINDING = 2
 _TERMINAL = 3
-_CUSTOM_VERB = 4
 _Segment = namedtuple('_Segment', ['kind', 'literal'])
 
 
@@ -57,18 +54,7 @@ def _format(segments):
             slash = False
         if segment.kind == _END_BINDING:
             template += '%s}' % segment.literal
-        if segment.kind == _CUSTOM_VERB:
-            template += ':%s' % segment.literal
     return template[1:]  # Remove the leading /
-
-
-def _parse_custom_verb(data):
-    custom_verb = None
-    match_obj = _CUSTOM_VERB_PATTERN.search(data)
-    if match_obj:
-        custom_verb = match_obj.group(1)
-        data = data[0:-len(custom_verb) - 1]
-    return custom_verb, data
 
 
 class ValidationException(Exception):
@@ -112,7 +98,8 @@ class PathTemplate(object):
             if segment.kind == _BINDING:
                 if segment.literal not in bindings:
                     raise ValidationException(
-                        'instantiate error: value for key \'%s\' not provided')
+                        ('instantiate error: value for key \'{}\' '
+                         'not provided').format(segment.literal))
                 out.extend(PathTemplate(bindings[segment.literal]).segments)
                 binding = True
             elif segment.kind == _END_BINDING:
@@ -138,10 +125,7 @@ class PathTemplate(object):
             ValidationException: If path can't be matched to the template.
         """
         this = self.segments
-        custom_verb, path = _parse_custom_verb(path)
         that = path.split('/')
-        if custom_verb:
-            that.append(custom_verb)
         current_var = None
         bindings = {}
         segment_count = self.segment_count
@@ -149,7 +133,7 @@ class PathTemplate(object):
         for i in range(0, len(this)):
             if j >= len(that):
                 break
-            if this[i].kind in [_TERMINAL, _CUSTOM_VERB]:
+            if this[i].kind == _TERMINAL:
                 if this[i].literal == '*':
                     bindings[current_var] = that[j]
                     j += 1
@@ -190,7 +174,7 @@ class _Parser(object):
     t_EQUALS = r'='
     t_WILDCARD = r'\*'
     t_PATH_WILDCARD = r'\*\*'
-    t_LITERAL = r'[a-zA-Z0-9\._~%-]+'
+    t_LITERAL = r'[^*=}{}\/]+'
 
     t_ignore = ' \t'
 
@@ -212,11 +196,7 @@ class _Parser(object):
         self.binding_var_count = 0
         self.segment_count = 0
 
-        custom_verb, data = _parse_custom_verb(data)
         segments = self.parser.parse(data)
-        if custom_verb:
-            segments.append(_Segment(_CUSTOM_VERB, custom_verb))
-            self.segment_count += 1
         # Validation step: checks that there are no nested bindings.
         path_wildcard = False
         for segment in segments:

@@ -44,7 +44,7 @@ class TestPathTemplate(unittest2.TestCase):
 
     def test_fail_invalid_token(self):
         self.assertRaises(ValidationException,
-                          PathTemplate, 'hello/wor@ld')
+                          PathTemplate, 'hello/wor*ld')
 
     def test_fail_when_impossible_match(self):
         template = PathTemplate('hello/world')
@@ -92,11 +92,6 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual({'$0': 'foo', '$1': 'bar/baz'},
                          template.match('buckets/foo/objects/bar/baz'))
 
-    def test_match_with_custom_method(self):
-        template = PathTemplate('buckets/*/objects/*:custom')
-        self.assertEqual({'$0': 'b', '$1': 'o'},
-                         template.match('buckets/b/objects/o:custom'))
-
     def test_match_with_unbound_in_middle(self):
         template = PathTemplate('bar/**/foo/*')
         self.assertEqual({'$0': 'foo/foo', '$1': 'bar'},
@@ -104,9 +99,9 @@ class TestPathTemplate(unittest2.TestCase):
 
     def test_instantiate_atomic_resource(self):
         template = PathTemplate('buckets/*/*/*/objects/*')
-        url = template.instantiate(
-            {'$0': 'f', '$1': 'o', '$2': 'o', '$3': 'bar'})
-        self.assertEqual(url, 'buckets/f/o/o/objects/bar')
+        url = template.instantiate({
+            '$0': 'f', '$1': 'o', '$2': 'o', '$3': 'google.com:a-b'})
+        self.assertEqual(url, 'buckets/f/o/o/objects/google.com:a-b')
 
     def test_instantiate_fail_when_too_few_variables(self):
         template = PathTemplate('buckets/*/*/*/objects/*')
@@ -122,11 +117,11 @@ class TestPathTemplate(unittest2.TestCase):
     def test_to_string(self):
         template = PathTemplate('bar/**/foo/*')
         self.assertEqual(str(template), 'bar/{$0=**}/foo/{$1=*}')
-        template = PathTemplate('buckets/*/objects/*:custom')
-        self.assertEqual(str(template), 'buckets/{$0=*}/objects/{$1=*}:custom')
+        template = PathTemplate('buckets/*/objects/*')
+        self.assertEqual(str(template), 'buckets/{$0=*}/objects/{$1=*}')
         template = PathTemplate('/buckets/{hello}')
         self.assertEqual(str(template), 'buckets/{hello=*}')
         template = PathTemplate('/buckets/{hello=what}/{world}')
         self.assertEqual(str(template), 'buckets/{hello=what}/{world=*}')
-        template = PathTemplate('/buckets/helloazAZ09-.~_:what')
-        self.assertEqual(str(template), 'buckets/helloazAZ09-.~_:what')
+        template = PathTemplate('/buckets/helloazAZ09-.~_what')
+        self.assertEqual(str(template), 'buckets/helloazAZ09-.~_what')
