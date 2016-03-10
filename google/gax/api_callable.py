@@ -97,27 +97,28 @@ def _bundleable(a_func, desc, bundler):
 
     It transform a_func from an API call that receives the requests and returns
     the response into a callable that receives the same request, and
-    returns two values (collections.deque, callable[[], boolean]).
+    returns a :class:`bundling.Event`.
 
-    The collections.deque will eventually contain the response to the call to
-    bundle; the second value when not None is a cancellation function to stop
-    the request from being used in the bundle.
+    The returned Event object can be used to obtain the eventual result of the
+    bundled call.
 
     Args:
         a_func (callable[[req], resp]): an API call that supports bundling.
-        desc (gax.BundleDescriptor): describes the bundling that a_func supports
-        bundler (gax.bundling.Executor): orchestrates bundling
+        desc (gax.BundleDescriptor): describes the bundling that a_func
+          supports.
+        bundler (gax.bundling.Executor): orchestrates bundling.
 
     Returns:
-        callable: it takes the API call's request and returns the two
-          values described above
+        callable: takes the API call's request and keyword args and returns a
+          bundling.Event object.
 
     """
-    def inner(request):
+    def inner(*args, **kwargs):
         """Schedules execution of a bundling task."""
+        request = args[0]
         the_id = bundling.compute_bundle_id(
             request, desc.request_discriminator_fields)
-        return bundler.schedule(a_func, the_id, desc, request)
+        return bundler.schedule(a_func, the_id, desc, request, kwargs)
 
     return inner
 
