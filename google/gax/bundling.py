@@ -133,14 +133,14 @@ class Task(object):
         self._event_deque = collections.deque()
 
     @property
-    def message_count(self):
-        """The number of bundled messages."""
-        return sum(len(msgs) for msgs in self._in_deque)
+    def element_count(self):
+        """The number of bundled elements in the repeated field."""
+        return sum(len(elts) for elts in self._in_deque)
 
     @property
-    def message_bytesize(self):
-        """The size of in bytes of the bundle messages."""
-        return sum(len(str(m)) for msgs in self._in_deque for m in msgs)
+    def request_bytesize(self):
+        """The size of in bytes of the bundled field elements."""
+        return sum(len(str(e)) for elts in self._in_deque for e in elts)
 
     def run(self):
         """Call the task's func.
@@ -152,7 +152,7 @@ class Task(object):
         req = self._bundling_request
         setattr(req,
                 self.bundled_field,
-                [m for msgs in self._in_deque for m in msgs])
+                [e for elts in self._in_deque for e in elts])
 
         subresponse_field = self.subresponse_field
         if subresponse_field:
@@ -177,7 +177,7 @@ class Task(object):
     def _run_with_subresponses(self, req, subresponse_field, kwargs):
         try:
             resp = self._api_call(req, **kwargs)
-            in_sizes = [len(msgs) for msgs in self._in_deque]
+            in_sizes = [len(elts) for elts in self._in_deque]
             all_subresponses = getattr(resp, subresponse_field)
             if len(all_subresponses) != sum(in_sizes):
                 _LOG.warn(_WARN_DEMUX_MISMATCH, len(all_subresponses),
@@ -202,52 +202,52 @@ class Task(object):
             self._in_deque.clear()
             self._event_deque.clear()
 
-    def extend(self, msgs):
-        """Adds msgs to the tasks.
+    def extend(self, elts):
+        """Adds elts to the tasks.
 
         Args:
-           msgs: a iterable of messages that can be appended to the task's
+           elts: a iterable of elements that can be appended to the task's
             bundle_field.
 
         Returns:
            an :class:`Event` that can be used to wait on the response.
         """
-        self._in_deque.append(msgs)
-        event = self._event_for(msgs)
+        self._in_deque.append(elts)
+        event = self._event_for(elts)
         self._event_deque.append(event)
         return event
 
-    def _event_for(self, msgs):
-        """Creates an Event that is set when the bundle with msgs is sent."""
+    def _event_for(self, elts):
+        """Creates an Event that is set when the bundle with elts is sent."""
         event = Event()
-        event.canceller = self._canceller_for(msgs, event)
+        event.canceller = self._canceller_for(elts, event)
         return event
 
-    def _canceller_for(self, msgs, event):
-        """Obtains a cancellation function that removes msgs.
+    def _canceller_for(self, elts, event):
+        """Obtains a cancellation function that removes elts.
 
-        The returned cancellation function returns ``True`` if all messages
+        The returned cancellation function returns ``True`` if all elements
         was removed successfully from the _in_deque, and false if it was not.
 
 
         Args:
-           msgs (iterable): the messages to be cancelled.
+           elts (iterable): the elements to be cancelled.
 
         Returns:
-           (callable[[], boolean]): used to remove the messages from the
+           (callable[[], boolean]): used to remove the elements from the
               _in_deque.
         """
 
         def canceller():
-            """Cancels submission of ``msgs`` as part of this bundle.
+            """Cancels submission of ``elts`` as part of this bundle.
 
             Returns:
-               ``False`` if any of messages had already been sent, otherwise
+               ``False`` if any of elements had already been sent, otherwise
                ``True``.
             """
             try:
                 self._event_deque.remove(event)
-                self._in_deque.remove(msgs)
+                self._in_deque.remove(elts)
                 return True
             except ValueError:
                 return False
@@ -306,17 +306,17 @@ class Executor(object):
         kwargs = kwargs or dict()
         bundle = self._bundle_for(api_call, bundle_id, bundle_desc,
                                   bundling_request, kwargs)
-        msgs = getattr(bundling_request, bundle_desc.bundled_field)
-        event = bundle.extend(msgs)
+        elts = getattr(bundling_request, bundle_desc.bundled_field)
+        event = bundle.extend(elts)
 
         # Run the bundle if the count threshold was reached.
-        count_threshold = self._options.message_count_threshold
-        if count_threshold > 0 and bundle.message_count >= count_threshold:
+        count_threshold = self._options.element_count_threshold
+        if count_threshold > 0 and bundle.element_count >= count_threshold:
             self._run_now(bundle.bundle_id)
 
         # Run the bundle if the size threshold was reached.
-        size_threshold = self._options.message_bytesize_threshold
-        if size_threshold > 0 and bundle.message_bytesize >= size_threshold:
+        size_threshold = self._options.request_byte_threshold
+        if size_threshold > 0 and bundle.request_bytesize >= size_threshold:
             self._run_now(bundle.bundle_id)
 
         return event
