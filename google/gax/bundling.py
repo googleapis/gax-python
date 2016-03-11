@@ -58,14 +58,14 @@ def _str_dotted_getattr(obj, name):
     """Expands extends getattr to allow dots in x to indicate nested objects.
 
     Args:
-       obj: an object
-       name: a name for a field in the object
+       obj: an object.
+       name: a name for a field in the object.
 
     Returns:
-       the value of named attribute
+       the value of named attribute.
 
     Raises:
-       AttributeError if the named attribute does not exist
+       AttributeError if the named attribute does not exist.
     """
     if name.find('.') == -1:
         return getattr(obj, name)
@@ -87,15 +87,15 @@ def compute_bundle_id(obj, discriminator_fields):
     if any discriminator field cannot be found, ValueError is raised.
 
     Args:
-      obj: an object
+      obj: an object.
       discriminator_fields: a list of discriminator fields in the order to be
-        to be used in the id
+        to be used in the id.
 
     Returns:
-      tuple: computed as described above
+      tuple: computed as described above.
 
     Raises:
-      AttributeError: if any discriminator fields attribute does not exist
+      AttributeError: if any discriminator fields attribute does not exist.
     """
     return tuple(_str_dotted_getattr(obj, x) for x in discriminator_fields)
 
@@ -107,22 +107,25 @@ _WARN_DEMUX_MISMATCH = ('cannot demultiplex the bundled response, got'
 
 class Task(object):
     """Coordinates the execution of a single bundle."""
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, api_call, bundle_id, bundled_field, bundling_request,
-                 subresponse_field=None):
+                 kwargs, subresponse_field=None):
         """Constructor.
 
         Args:
            api_call (callable[[object], object]): the func that is this tasks's
-             API call
-           bundle_id (tuple): the id of this bundle
-           bundle_field (str): the field used to create the bundled request
-           bundling_request (object): the request to pass as the arg to api_call
-           subresponse_field (str): optional field used to demultiplex responses
+             API call.
+           bundle_id (tuple): the id of this bundle.
+           bundle_field (str): the field used to create the bundled request.
+           bundling_request (object): the request to pass as the arg to api_call.
+           kwargs (dict): keyword arguments passed to api_call.
+           subresponse_field (str): optional field used to demultiplex responses.
 
         """
         self._api_call = api_call
         self._bundling_request = bundling_request
+        self._kwargs = kwargs
         self.bundle_id = bundle_id
         self.bundled_field = bundled_field
         self.subresponse_field = subresponse_field
@@ -153,13 +156,13 @@ class Task(object):
 
         subresponse_field = self.subresponse_field
         if subresponse_field:
-            self._run_with_subresponses(req, subresponse_field)
+            self._run_with_subresponses(req, subresponse_field, self._kwargs)
         else:
-            self._run_with_no_subresponse(req)
+            self._run_with_no_subresponse(req, self._kwargs)
 
-    def _run_with_no_subresponse(self, req):
+    def _run_with_no_subresponse(self, req, kwargs):
         try:
-            resp = self._api_call(req)
+            resp = self._api_call(req, **kwargs)
             for event in self._event_deque:
                 event.result = resp
                 event.set()
@@ -171,9 +174,9 @@ class Task(object):
             self._in_deque.clear()
             self._event_deque.clear()
 
-    def _run_with_subresponses(self, req, subresponse_field):
+    def _run_with_subresponses(self, req, subresponse_field, kwargs):
         try:
-            resp = self._api_call(req)
+            resp = self._api_call(req, **kwargs)
             in_sizes = [len(msgs) for msgs in self._in_deque]
             all_subresponses = getattr(resp, subresponse_field)
             if len(all_subresponses) != sum(in_sizes):
@@ -204,10 +207,10 @@ class Task(object):
 
         Args:
            msgs: a iterable of messages that can be appended to the task's
-            bundle_field
+            bundle_field.
 
         Returns:
-           an :class:`Event` that can be used to wait on the response
+           an :class:`Event` that can be used to wait on the response.
         """
         self._in_deque.append(msgs)
         event = self._event_for(msgs)
@@ -221,18 +224,18 @@ class Task(object):
         return event
 
     def _canceller_for(self, msgs, event):
-        """Obtains a cancellation function that removes msgs
+        """Obtains a cancellation function that removes msgs.
 
-`        The returned cancellation function returns ``True`` if all messages
+        The returned cancellation function returns ``True`` if all messages
         was removed successfully from the _in_deque, and false if it was not.
 
 
         Args:
-           msgs (iterable): the messages to be cancelled
+           msgs (iterable): the messages to be cancelled.
 
         Returns:
            (callable[[], boolean]): used to remove the messages from the
-              _in_deque
+              _in_deque.
         """
 
         def canceller():
@@ -240,7 +243,7 @@ class Task(object):
 
             Returns:
                ``False`` if any of messages had already been sent, otherwise
-               ``True``
+               ``True``.
             """
             try:
                 self._event_deque.remove(event)
@@ -276,7 +279,8 @@ class Executor(object):
         self._task_lock = threading.RLock()
         self._timer = None
 
-    def schedule(self, api_call, bundle_id, bundle_desc, bundling_request):
+    def schedule(self, api_call, bundle_id, bundle_desc, bundling_request,
+                 kwargs=None):
         """Schedules bundle_desc of bundling_request as part of bundle_id.
 
         The returned value an :class:`Event` that
@@ -287,18 +291,21 @@ class Executor(object):
         * holds the canceller function for canceling this part of the bundle
 
         Args:
-          api_call (callable[[object], object]): the scheduled API call
+          api_call (callable[[object], object]): the scheduled API call.
           bundle_id (str): identifies the bundle on which the API call should be
-            made
+            made.
           bundle_desc (gax.BundleDescriptor): describes the structure of the
-            bundled call
-          bundling_request (object): the request instance to use in the API call
+            bundled call.
+          bundling_request (object): the request instance to use in the API
+            call.
+          kwargs (dict): optional, the keyword arguments passed to the API call.
 
         Returns:
-           an :class:`Event`
+           an :class:`Event`.
         """
+        kwargs = kwargs or dict()
         bundle = self._bundle_for(api_call, bundle_id, bundle_desc,
-                                  bundling_request)
+                                  bundling_request, kwargs)
         msgs = getattr(bundling_request, bundle_desc.bundled_field)
         event = bundle.extend(msgs)
 
@@ -314,12 +321,13 @@ class Executor(object):
 
         return event
 
-    def _bundle_for(self, api_call, bundle_id, bundle_desc, bundling_request):
+    def _bundle_for(self, api_call, bundle_id, bundle_desc, bundling_request,
+                    kwargs):
         with self._task_lock:
             bundle = self._tasks.get(bundle_id)
             if bundle is None:
                 bundle = Task(api_call, bundle_id, bundle_desc.bundled_field,
-                              bundling_request,
+                              bundling_request, kwargs,
                               subresponse_field=bundle_desc.subresponse_field)
                 delay_threshold = self._options.delay_threshold
                 if delay_threshold > 0:

@@ -125,12 +125,18 @@ def _return_request(req):
     return req
 
 
+def _return_kwargs(dummy_req, **kwargs):
+    """A dummy api call that simply returns its keyword arguments."""
+    return kwargs
+
+
 def _make_a_test_task(api_call=_return_request):
     return bundling.Task(
         api_call,
         'an_id',
         'field1',
-        _Simple('dummy_value'))
+        _Simple('dummy_value'),
+        dict())
 
 
 def _extend_with_n_msgs(a_task, msg, n):
@@ -393,6 +399,21 @@ class TestExecutor(unittest2.TestCase):
                             'event is not set after triggering message')
             self.assertEquals(event.result, mismatched_result)
             previous_event = event
+
+    def test_schedule_passes_kwargs(self):
+        a_msg = 'dummy_msg'
+        options = BundleOptions(message_count_threshold=1)
+        bundle_id = 'an_id'
+        bundler = bundling.Executor(options)
+        event = bundler.schedule(
+            _return_kwargs,
+            bundle_id,
+            SIMPLE_DESCRIPTOR,
+            _Simple([a_msg]),
+            {'an_option': 'a_value'}
+        )
+        self.assertEquals('a_value',
+                          event.result['an_option'])
 
 
 class TestExecutor_MessageCountTrigger(unittest2.TestCase):
