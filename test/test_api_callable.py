@@ -66,7 +66,7 @@ _CONFIG = {
             'retry_codes_name': 'foo_retry',
             'retry_params_name': 'default',
             'bundle_options': {
-                'message_count_threshold': 6},
+                'element_count_threshold': 6},
             'bundle_descriptor': {
                 'bundled_field': 'abc',
                 'request_discriminator_fields': []}
@@ -180,14 +180,14 @@ class TestApiCallable(unittest2.TestCase):
     def test_bundling(self):
         # pylint: disable=abstract-method, too-few-public-methods
         class BundlingRequest(object):
-            def __init__(self, messages=None):
-                self.messages = messages
+            def __init__(self, elements=None):
+                self.elements = elements
 
-        fake_grpc_func_descriptor = BundleDescriptor('messages', [])
-        bundler = bundling.Executor(BundleOptions(message_count_threshold=8))
+        fake_grpc_func_descriptor = BundleDescriptor('elements', [])
+        bundler = bundling.Executor(BundleOptions(element_count_threshold=8))
 
         def my_func(request, dummy_timeout):
-            return len(request.messages)
+            return len(request.elements)
 
         settings = CallSettings(
             bundler=bundler, bundle_descriptor=fake_grpc_func_descriptor,

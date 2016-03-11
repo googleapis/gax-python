@@ -48,10 +48,10 @@ class TestBundleOptions(unittest2.TestCase):
         not_an_int = 'i am a string'
         self.assertRaises(AssertionError,
                           BundleOptions,
-                          message_count_threshold=not_an_int)
+                          element_count_threshold=not_an_int)
         self.assertRaises(AssertionError,
                           BundleOptions,
-                          message_bytesize_threshold=not_an_int)
+                          request_byte_threshold=not_an_int)
         self.assertRaises(AssertionError,
                           BundleOptions,
                           delay_threshold=not_an_int)

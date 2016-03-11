@@ -206,7 +206,7 @@ class BundleDescriptor(
 
     Attributes:
       bundled_field: the repeated field in the request message that
-        will have its messages aggregated by bundling
+        will have its elements aggregated by bundling
       request_discriminator_fields: a list of fields in the
         target request message class that are used to determine
         which messages should be bundled together.
@@ -228,8 +228,8 @@ class BundleDescriptor(
 class BundleOptions(
         collections.namedtuple(
             'BundleOptions',
-            ['message_count_threshold',
-             'message_bytesize_threshold',
+            ['element_count_threshold',
+             'request_byte_threshold',
              'delay_threshold'])):
     """Holds values used to configure bundling.
 
@@ -237,19 +237,23 @@ class BundleOptions(
     should be made.
 
     Attributes:
-        message_count_threshold: the bundled request will be sent once
-            the count of outstanding messages reaches this value
-        message_bytesize_threshold: the bundled request will be sent once
-            the count of bytes in the outstanding messages reaches this value
+        element_count_threshold: the bundled request will be sent once the
+          count of outstanding elements in the repeated field reaches this
+          value.
+        request_byte_threshold: the bundled request will be sent once the count
+          of bytes in the request reaches this value. Note that this value is
+          pessimistically approximated by summing the bytesizes of the elements
+          in the repeated field, with a buffer applied to compensate for the
+          corresponding under-approximation.
         delay_threshold: the bundled request will be sent this amount of
-            time after the first message in the bundle was added to it.
+          time after the first element in the bundle was added to it.
 
     """
     # pylint: disable=too-few-public-methods
 
     def __new__(cls,
-                message_count_threshold=0,
-                message_bytesize_threshold=0,
+                element_count_threshold=0,
+                request_byte_threshold=0,
                 delay_threshold=0):
         """Invokes the base constructor with default values.
 
@@ -257,23 +261,27 @@ class BundleOptions(
         specify at least one valid threshold value during construction.
 
         Args:
-           message_count_threshold: the bundled request will be sent once
-             the count of outstanding messages reaches this value
-           message_bytesize_threshold: the bundled request will be sent once
-             the count of bytes in the outstanding messages reaches this value
+           element_count_threshold: the bundled request will be sent once the
+             count of outstanding elements in the repeated field reaches this
+             value.
+           request_byte_threshold: the bundled request will be sent once the count
+             of bytes in the request reaches this value. Note that this value is
+             pessimistically approximated by summing the bytesizes of the elements
+             in the repeated field, with a buffer applied to compensate for the
+             corresponding under-approximation.
            delay_threshold: the bundled request will be sent this amount of
-              time after the first message in the bundle was added to it.
+             time after the first element in the bundle was added to it.
 
         """
-        assert isinstance(message_count_threshold, int), 'should be an int'
-        assert isinstance(message_bytesize_threshold, int), 'should be an int'
+        assert isinstance(element_count_threshold, int), 'should be an int'
+        assert isinstance(request_byte_threshold, int), 'should be an int'
         assert isinstance(delay_threshold, int), 'should be an int'
-        assert (message_bytesize_threshold > 0 or
-                message_count_threshold > 0 or
+        assert (element_count_threshold > 0 or
+                request_byte_threshold > 0 or
                 delay_threshold > 0), 'one threshold should be > 0'
 
         return super(cls, BundleOptions).__new__(
             cls,
-            message_count_threshold,
-            message_bytesize_threshold,
+            element_count_threshold,
+            request_byte_threshold,
             delay_threshold)
