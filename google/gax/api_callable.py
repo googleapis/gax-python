@@ -30,9 +30,15 @@
 """Provides function wrappers that implement page streaming and retrying."""
 
 from __future__ import absolute_import, division
+import random
+import time
 
 from . import (BackoffSettings, BundleDescriptor, BundleOptions, bundling,
-               CallSettings, OPTION_INHERIT, PageDescriptor, RetryOptions)
+               CallSettings, OPTION_INHERIT, PageDescriptor, RetryOptions,
+               RetryException)
+
+
+_MILLIS_PER_SECOND = 1000
 
 
 def _add_timeout_arg(a_func, timeout):
@@ -73,21 +79,50 @@ def _retryable(a_func, retry):
         A function that will retry on exception.
     """
 
-    max_attempts = int(retry.backoff_settings.total_timeout_millis /
-                       retry.backoff_settings.initial_rpc_timeout_millis)
+    delay_mult = retry.backoff_settings.retry_delay_multiplier
+    max_delay = (retry.backoff_settings.max_retry_delay_millis /
+                 _MILLIS_PER_SECOND)
+    timeout_mult = retry.backoff_settings.rpc_timeout_multiplier
+    max_timeout = (retry.backoff_settings.max_rpc_timeout_millis /
+                   _MILLIS_PER_SECOND)
+    total_timeout = (retry.backoff_settings.total_timeout_millis /
+                     _MILLIS_PER_SECOND)
 
     def inner(*args, **kwargs):
-        "Retries a_func upto max_attempt times"
-        attempt_count = 0
-        while 1:
+        """Equivalent to ``a_func``, but retries upon transient failure.
+
+        Retrying is done through an exponential backoff algorithm configured
+        by the options in ``retry``.
+        """
+        delay = retry.backoff_settings.initial_retry_delay_millis
+        timeout = (retry.backoff_settings.initial_rpc_timeout_millis /
+                   _MILLIS_PER_SECOND)
+        exc = RetryException('Retry total timeout exceeded before any'
+                             'response was received')
+        now = time.time()
+        deadline = now + total_timeout
+
+        while now < deadline:
             try:
-                return a_func(*args, **kwargs)
+                to_call = _add_timeout_arg(a_func, timeout)
+                return to_call(*args, **kwargs)
+
             # pylint: disable=catching-non-exception
-            except tuple(retry.retry_codes):
-                attempt_count += 1
-                if attempt_count < max_attempts:
-                    continue
+            except tuple(retry.retry_codes) as exception:
+                # pylint: disable=redefined-variable-type
+                exc = exception
+                to_sleep = random.uniform(0, delay)
+                time.sleep(to_sleep / _MILLIS_PER_SECOND)
+                now = time.time()
+                delay = min(delay * delay_mult, max_delay)
+                timeout = min(
+                    timeout * timeout_mult, max_timeout, deadline - now)
+                continue
+
+            except:
                 raise
+
+        raise exc
 
     return inner
 
@@ -126,8 +161,7 @@ def _bundleable(a_func, desc, bundler):
 def _page_streamable(a_func,
                      request_page_token_field,
                      response_page_token_field,
-                     resource_field,
-                     timeout):
+                     resource_field):
     """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
@@ -136,18 +170,16 @@ def _page_streamable(a_func,
         response_page_token_field: The field of the next page token in the
           response.
         resource_field: The field to be streamed.
-        timeout: the timeout to apply to the API call.
 
     Returns:
         A function that returns an iterable over the specified field.
     """
-    with_timeout = _add_timeout_arg(a_func, timeout)
 
     def inner(*args, **kwargs):
         """A generator that yields all the paged responses."""
         request = args[0]
         while True:
-            response = with_timeout(request, **kwargs)
+            response = a_func(request, **kwargs)
             for obj in getattr(response, resource_field):
                 yield obj
             next_page_token = getattr(response, response_page_token_field)
@@ -358,8 +390,14 @@ class ApiCallable(object):
 
         # Update the_func using each of the applicable function decorators
         # before calling.
+
+        # Note that the retrying decorator handles timeouts; otherwise, it
+        # explicit partial application of the timeout argument is required.
         if self.settings.retry:
             the_func = _retryable(the_func, self.settings.retry)
+        else:
+            the_func = _add_timeout_arg(the_func, self.settings.timeout)
+
         if self.settings.page_descriptor:
             if self.settings.bundler and self.settings.bundle_descriptor:
                 raise ValueError('ApiCallable has incompatible settings: '
@@ -368,10 +406,8 @@ class ApiCallable(object):
                 the_func,
                 self.settings.page_descriptor.request_page_token_field,
                 self.settings.page_descriptor.response_page_token_field,
-                self.settings.page_descriptor.resource_field,
-                self.settings.timeout)
+                self.settings.page_descriptor.resource_field)
         else:
-            the_func = _add_timeout_arg(the_func, self.settings.timeout)
             if self.settings.bundler and self.settings.bundle_descriptor:
                 the_func = _bundleable(
                     the_func, self.settings.bundle_descriptor,

@@ -228,16 +228,7 @@ class Task(object):
 
         The returned cancellation function returns ``True`` if all elements
         was removed successfully from the _in_deque, and false if it was not.
-
-
-        Args:
-           elts (iterable): the elements to be cancelled.
-
-        Returns:
-           (callable[[], boolean]): used to remove the elements from the
-              _in_deque.
         """
-
         def canceller():
             """Cancels submission of ``elts`` as part of this bundle.
 
