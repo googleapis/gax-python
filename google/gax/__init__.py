@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.5.1'
+__version__ = '0.6.0'
 
 
 OPTION_INHERIT = object()
@@ -154,6 +154,11 @@ class RetryOptions(
       backoff_settings: a BackoffSettings object configuring the retry
         exponential backoff algorithm.
     """
+    pass
+
+
+class RetryException(Exception):
+    """Represents exceptions that occur during retrying"""
     pass
 
 
