@@ -89,8 +89,16 @@ _RETRY_DICT = {'code_a': Exception,
                'code_c': Exception}
 
 
+_FAKE_STATUS_CODE_1 = object()
+
+
+_FAKE_STATUS_CODE_2 = object()
+
+
 class CustomException(Exception):
-    pass
+    def __init__(self, msg, code):
+        super(CustomException, self).__init__(msg)
+        self.code = code
 
 
 class TestApiCallable(unittest2.TestCase):
@@ -102,15 +110,18 @@ class TestApiCallable(unittest2.TestCase):
         self.assertEqual(my_callable(None), 42)
 
     @mock.patch('time.time')
-    def test_retry(self, mock_time):
+    @mock.patch('google.gax.config.exc_to_code')
+    def test_retry(self, mock_exc_to_code, mock_time):
+        mock_exc_to_code.side_effect = lambda e: e.code
         to_attempt = 3
         retry = RetryOptions(
-            [Exception],
+            [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 1))
 
         # Succeeds on the to_attempt'th call, and never again afterward
         mock_call = mock.Mock()
-        mock_call.side_effect = ([Exception] * (to_attempt - 1) + [mock.DEFAULT])
+        mock_call.side_effect = ([CustomException('', _FAKE_STATUS_CODE_1)] *
+                                 (to_attempt - 1) + [mock.DEFAULT])
         mock_call.return_value = 1729
         mock_time.return_value = 0
         settings = CallSettings(timeout=0, retry=retry)
@@ -119,26 +130,30 @@ class TestApiCallable(unittest2.TestCase):
         self.assertEqual(mock_call.call_count, to_attempt)
 
     @mock.patch('time.time')
-    def test_retry_aborts_simple(self, mock_time):
+    @mock.patch('google.gax.config.exc_to_code')
+    def test_retry_aborts_simple(self, mock_exc_to_code, mock_time):
         def fake_call(dummy_request, dummy_timeout):
-            raise CustomException
+            raise CustomException('', _FAKE_STATUS_CODE_1)
 
         retry = RetryOptions(
-            [CustomException],
+            [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 1))
         mock_time.side_effect = [0, 2]
+        mock_exc_to_code.side_effect = lambda e: e.code
         settings = CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.ApiCallable(fake_call, settings)
         self.assertRaises(CustomException, my_callable, None)
 
     @mock.patch('time.time')
-    def test_retry_times_out_simple(self, mock_time):
+    @mock.patch('google.gax.config.exc_to_code')
+    def test_retry_times_out_simple(self, mock_exc_to_code, mock_time):
+        mock_exc_to_code.side_effect = lambda e: e.code
         to_attempt = 3
         retry = RetryOptions(
-            [CustomException],
+            [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 1))
         mock_call = mock.Mock()
-        mock_call.side_effect = CustomException
+        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
         mock_time.side_effect = ([0] * to_attempt + [2])
         settings = CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.ApiCallable(mock_call, settings)
@@ -146,12 +161,15 @@ class TestApiCallable(unittest2.TestCase):
         self.assertEqual(mock_call.call_count, to_attempt)
 
     @mock.patch('time.time')
-    def test_retry_aborts_on_unexpected_exception(self, mock_time):
+    @mock.patch('google.gax.config.exc_to_code')
+    def test_retry_aborts_on_unexpected_exception(
+            self, mock_exc_to_code, mock_time):
+        mock_exc_to_code.side_effect = lambda e: e.code
         retry = RetryOptions(
-            [CustomException],
+            [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 1))
         mock_call = mock.Mock()
-        mock_call.side_effect = Exception
+        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_2)
         mock_time.return_value = 0
         settings = CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.ApiCallable(mock_call, settings)
@@ -160,23 +178,22 @@ class TestApiCallable(unittest2.TestCase):
 
     @mock.patch('time.time')
     def test_retry_times_out_no_response(self, mock_time):
-        def fake_call(*dummy_args, **dummy_kwargs):
-            while True:
-                pass
-
         mock_time.return_value = 1
         retry = RetryOptions(
-            [CustomException],
+            [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 0))
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.ApiCallable(fake_call, settings)
+        my_callable = api_callable.ApiCallable(lambda: None, settings)
 
         self.assertRaises(RetryException, my_callable, None)
 
     @mock.patch('time.sleep')
     @mock.patch('time.time')
-    def test_retry_exponential_backoff(self, mock_time, mock_sleep):
+    @mock.patch('google.gax.config.exc_to_code')
+    def test_retry_exponential_backoff(self, mock_exc_to_code, mock_time,
+                                       mock_sleep):
         # pylint: disable=too-many-locals
+        mock_exc_to_code.side_effect = lambda e: e.code
         MILLIS_PER_SEC = 1000
         mock_time.return_value = 0
 
@@ -185,14 +202,14 @@ class TestApiCallable(unittest2.TestCase):
 
         def api_call(dummy_request, timeout, **dummy_kwargs):
             incr_time(timeout)
-            raise CustomException(str(timeout))
+            raise CustomException(str(timeout), _FAKE_STATUS_CODE_1)
 
         mock_call = mock.Mock()
         mock_sleep.side_effect = incr_time
         mock_call.side_effect = api_call
 
         params = BackoffSettings(3, 2, 24, 5, 2, 80, 2500)
-        retry = RetryOptions([CustomException], params)
+        retry = RetryOptions([_FAKE_STATUS_CODE_1], params)
         settings = CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.ApiCallable(mock_call, settings)
 
