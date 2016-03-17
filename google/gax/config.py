@@ -31,28 +31,41 @@
 
 from __future__ import absolute_import
 
+from grpc.beta.interfaces import StatusCode
 from grpc.framework.interfaces.face import face
 from . import grpc
 
 
-# TODO: Determine which exceptions we support.
-EXCEPTION_NAMES = {
-    'ABORTED': face.AbortionError,
-    'CANCELLED': face.CancellationError,
-    'DATA_LOSS': face.NetworkError,
-    'DEADLINE_EXCEEDED': face.ExpirationError,
-    'FAILED_PRECONDITION': face.AbortionError,
-    'INTERNAL': face.AbortionError,
-    'INVALID_ARGUMENT': face.AbortionError,
-    'NOT_FOUND': face.AbortionError,
-    'OUT_OF_RANGE': face.AbortionError,
-    'PERMISSION_DENIED': face.AbortionError,
-    'RESOURCE_EXHAUSTED': face.AbortionError,
-    'UNAUTHENTICATED': face.AbortionError,
-    'UNAVAILABLE': face.AbortionError,
-    'UNIMPLEMENTED': face.AbortionError,
-    'UNKNOWN': face.AbortionError}
+def exc_to_code(exc):
+    """Retrieves the status code from an exception"""
+    if not isinstance(exc, face.AbortionError):
+        return None
+    else:
+        return getattr(exc, 'code', None)
 
 
-create_stub = grpc.create_stub  # pylint: disable=invalid-name
+STATUS_CODE_NAMES = {
+    'ABORTED': StatusCode.ABORTED,
+    'CANCELLED': StatusCode.CANCELLED,
+    'DATA_LOSS': StatusCode.DATA_LOSS,
+    'DEADLINE_EXCEEDED': StatusCode.DEADLINE_EXCEEDED,
+    'FAILED_PRECONDITION': StatusCode.FAILED_PRECONDITION,
+    'INTERNAL': StatusCode.INTERNAL,
+    'INVALID_ARGUMENT': StatusCode.INVALID_ARGUMENT,
+    'NOT_FOUND': StatusCode.NOT_FOUND,
+    'OUT_OF_RANGE': StatusCode.OUT_OF_RANGE,
+    'PERMISSION_DENIED': StatusCode.PERMISSION_DENIED,
+    'RESOURCE_EXHAUSTED': StatusCode.RESOURCE_EXHAUSTED,
+    'UNAUTHENTICATED': StatusCode.UNAUTHENTICATED,
+    'UNAVAILABLE': StatusCode.UNAVAILABLE,
+    'UNIMPLEMENTED': StatusCode.UNIMPLEMENTED,
+    'UNKNOWN': StatusCode.UNKNOWN}
+"""Maps strings to the status codes they represent.
+
+This is necessary for google.gax.api_callable.construct_settings to translate
+the client constants configuration for retrying into the correct gRPC objects.
+"""
+
+
+create_stub = grpc.create_stub  # pylint: disable=invalid-name,
 """The function to use to create stubs."""
