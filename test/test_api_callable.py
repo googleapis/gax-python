@@ -130,6 +130,19 @@ class TestApiCallable(unittest2.TestCase):
         self.assertEqual(mock_call.call_count, to_attempt)
 
     @mock.patch('time.time')
+    def test_no_retry_if_no_codes(self, mock_time):
+        retry = RetryOptions([], BackoffSettings(1, 2, 3, 4, 5, 6, 7))
+
+        mock_call = mock.Mock()
+        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
+        mock_time.return_value = 0
+
+        settings = CallSettings(timeout=0, retry=retry)
+        my_callable = api_callable.ApiCallable(mock_call, settings)
+        self.assertRaises(CustomException, my_callable, None)
+        self.assertEqual(mock_call.call_count, 1)
+
+    @mock.patch('time.time')
     @mock.patch('google.gax.config.exc_to_code')
     def test_retry_aborts_simple(self, mock_exc_to_code, mock_time):
         def fake_call(dummy_request, dummy_timeout):

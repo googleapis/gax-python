@@ -393,7 +393,7 @@ class ApiCallable(object):
 
         # Note that the retrying decorator handles timeouts; otherwise, it
         # explicit partial application of the timeout argument is required.
-        if self.settings.retry:
+        if self.settings.retry and self.settings.retry.retry_codes:
             the_func = _retryable(the_func, self.settings.retry)
         else:
             the_func = _add_timeout_arg(the_func, self.settings.timeout)
