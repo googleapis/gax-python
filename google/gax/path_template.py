@@ -151,7 +151,9 @@ class PathTemplate(object):
             elif this[i].kind == _BINDING:
                 current_var = this[i].literal
         if j != len(that) or j != segment_count:
-            raise ValidationException('match error: impossible match')
+            raise ValidationException(
+                'match error: could not instantiate a path template from: {}'
+                .format(path))
         return bindings
 
 
