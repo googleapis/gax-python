@@ -40,6 +40,8 @@ def exc_to_code(exc):
     """Retrieves the status code from an exception"""
     if not isinstance(exc, face.AbortionError):
         return None
+    elif isinstance(exc, face.ExpirationError):
+        return StatusCode.DEADLINE_EXCEEDED
     else:
         return getattr(exc, 'code', None)
 
