@@ -57,7 +57,7 @@ def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
 
     Args:
         generated_create_stub: The generated gRPC method to create a stub.
-        service_path: The DNS of the API remote host.
+        service_path: The domain name of the API remote host.
         port: The port on which to connect to the remote host.
         ssl_creds: A ClientCredentials object for use with an SSL-enabled
             Channel. If none, credentials are pulled from a default location.
