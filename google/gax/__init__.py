@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.6.3'
+__version__ = '0.7.0'
 
 
 OPTION_INHERIT = object()
@@ -234,7 +234,9 @@ class BundleOptions(
         collections.namedtuple(
             'BundleOptions',
             ['element_count_threshold',
+             'element_count_limit',
              'request_byte_threshold',
+             'request_byte_limit',
              'delay_threshold'])):
     """Holds values used to configure bundling.
 
@@ -245,11 +247,22 @@ class BundleOptions(
         element_count_threshold: the bundled request will be sent once the
           count of outstanding elements in the repeated field reaches this
           value.
+        element_count_limit: represents a hard limit on the number of elements
+          in the repeated field of the bundle; if adding a request to a bundle
+          would exceed this value, the bundle is sent and the new request is
+          added to a fresh bundle. It is invalid for a single request to exceed
+          this limit.
         request_byte_threshold: the bundled request will be sent once the count
           of bytes in the request reaches this value. Note that this value is
           pessimistically approximated by summing the bytesizes of the elements
-          in the repeated field, with a buffer applied to compensate for the
-          corresponding under-approximation.
+          in the repeated field, and therefore may be an under-approximation.
+        request_byte_limit: represents a hard limit on the size of the bundled
+          request; if adding a request to a bundle would exceed this value, the
+          bundle is sent and the new request is added to a fresh bundle. It is
+          invalid for a single request to exceed this limit. Note that this
+          value is pessimistically approximated by summing the bytesizes of the
+          elements in the repeated field, with a buffer applied to correspond to
+          the resulting under-approximation.
         delay_threshold: the bundled request will be sent this amount of
           time after the first element in the bundle was added to it.
 
@@ -258,7 +271,9 @@ class BundleOptions(
 
     def __new__(cls,
                 element_count_threshold=0,
+                element_count_limit=0,
                 request_byte_threshold=0,
+                request_byte_limit=0,
                 delay_threshold=0):
         """Invokes the base constructor with default values.
 
@@ -269,17 +284,31 @@ class BundleOptions(
            element_count_threshold: the bundled request will be sent once the
              count of outstanding elements in the repeated field reaches this
              value.
-           request_byte_threshold: the bundled request will be sent once the count
-             of bytes in the request reaches this value. Note that this value is
-             pessimistically approximated by summing the bytesizes of the elements
-             in the repeated field, with a buffer applied to compensate for the
-             corresponding under-approximation.
+           element_count_limit: represents a hard limit on the number of
+             elements in the repeated field of the bundle; if adding a request
+             to a bundle would exceed this value, the bundle is sent and the new
+             request is added to a fresh bundle. It is invalid for a single
+             request to exceed this limit.
+           request_byte_threshold: the bundled request will be sent once the
+             count of bytes in the request reaches this value. Note that this
+             value is pessimistically approximated by summing the bytesizes of
+             the elements in the repeated field, with a buffer applied to
+             compensate for the corresponding under-approximation.
+           request_byte_limit: represents a hard limit on the size of the
+             bundled request; if adding a request to a bundle would exceed this
+             value, the bundle is sent and the new request is added to a fresh
+             bundle. It is invalid for a single request to exceed this
+             limit. Note that this value is pessimistically approximated by
+             summing the bytesizes of the elements in the repeated field, with a
+             buffer applied to correspond to the resulting under-approximation.
            delay_threshold: the bundled request will be sent this amount of
              time after the first element in the bundle was added to it.
 
         """
         assert isinstance(element_count_threshold, int), 'should be an int'
+        assert isinstance(element_count_limit, int), 'should be an int'
         assert isinstance(request_byte_threshold, int), 'should be an int'
+        assert isinstance(request_byte_limit, int), 'should be an int'
         assert isinstance(delay_threshold, int), 'should be an int'
         assert (element_count_threshold > 0 or
                 request_byte_threshold > 0 or
@@ -288,5 +317,7 @@ class BundleOptions(
         return super(cls, BundleOptions).__new__(
             cls,
             element_count_threshold,
+            element_count_limit,
             request_byte_threshold,
+            request_byte_limit,
             delay_threshold)

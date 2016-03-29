@@ -39,49 +39,53 @@ from google.gax import (
     CallSettings, PageDescriptor, RetryException, RetryOptions)
 
 
-_CONFIG = {
-    'retry_codes_def': [
-        {
-            'name': 'foo_retry',
-            'retry_codes': ['code_a', 'code_b']
-        },
-        {
-            'name': 'bar_retry',
-            'retry_codes': ['code_c']
-        }],
-    'retry_params': [
-        {
-            'name': 'default',
-            'initial_retry_delay_millis': 100,
-            'retry_delay_multiplier': 1.2,
-            'max_retry_delay_millis': 1000,
-            'initial_rpc_timeout_millis': 300,
-            'rpc_timeout_multiplier': 1.3,
-            'max_rpc_timeout_millis': 3000,
-            'total_timeout_millis': 30000
-        }],
-    'methods': [
-        {
-            'name': 'bundling_method',
-            'retry_codes_name': 'foo_retry',
-            'retry_params_name': 'default',
-            'bundle_options': {
-                'element_count_threshold': 6},
-            'bundle_descriptor': {
-                'bundled_field': 'abc',
-                'request_discriminator_fields': []}
-        },
-        {
-            'name': 'page_streaming_method',
-            'retry_codes_name': 'bar_retry',
-            'retry_params_name': 'default',
-            'page_streaming': {
-                'request': {
-                    'token_field': 'page_token'},
-                'response': {
-                    'token_field': 'next_page_token',
-                    'resources_field': 'page_streams'}}
-        }]}
+_SERVICE_NAME = 'test.interface.v1.api'
+
+
+_A_CONFIG = {
+    'interfaces': {
+        _SERVICE_NAME: {
+            'retry_codes': {
+                'foo_retry': ['code_a', 'code_b'],
+                'bar_retry': ['code_c']
+            },
+            'retry_params': {
+                'default': {
+                    'initial_retry_delay_millis': 100,
+                    'retry_delay_multiplier': 1.2,
+                    'max_retry_delay_millis': 1000,
+                    'initial_rpc_timeout_millis': 300,
+                    'rpc_timeout_multiplier': 1.3,
+                    'max_rpc_timeout_millis': 3000,
+                    'total_timeout_millis': 30000
+                }
+            },
+            'methods': {
+                'bundling_method': {
+                    'retry_codes_name': 'foo_retry',
+                    'retry_params_name': 'default',
+                    'bundling': {
+                        'element_count_threshold': 6,
+                        'element_count_limit': 10
+                    }
+                },
+                'page_streaming_method': {
+                    'retry_codes_name': 'bar_retry',
+                    'retry_params_name': 'default'
+                }
+            }
+        }
+    }
+}
+
+
+_PAGE_DESCRIPTORS = {
+    'page_streaming_method': PageDescriptor(
+        'page_token', 'next_page_token', 'page_streams')
+}
+
+
+_BUNDLE_DESCRIPTORS = {'bundling_method': BundleDescriptor('bundled_field', [])}
 
 
 _RETRY_DICT = {'code_a': Exception,
@@ -324,7 +328,8 @@ class TestApiCallable(unittest2.TestCase):
 
     def test_construct_settings(self):
         defaults = api_callable.construct_settings(
-            _CONFIG, dict(), dict(), _RETRY_DICT, 30)
+            _SERVICE_NAME, _A_CONFIG, _BUNDLE_DESCRIPTORS, _PAGE_DESCRIPTORS,
+            dict(), dict(), _RETRY_DICT, 30)
         settings = defaults['bundling_method']
         self.assertEquals(settings.timeout, 30)
         self.assertIsInstance(settings.bundler, bundling.Executor)
@@ -342,7 +347,8 @@ class TestApiCallable(unittest2.TestCase):
         _bundling_override = {'bundling_method': None}
         _retry_override = {'page_streaming_method': None}
         defaults = api_callable.construct_settings(
-            _CONFIG, _bundling_override, _retry_override, _RETRY_DICT, 30)
+            _SERVICE_NAME, _A_CONFIG, _BUNDLE_DESCRIPTORS, _PAGE_DESCRIPTORS,
+            _bundling_override, _retry_override, _RETRY_DICT, 30)
         settings = defaults['bundling_method']
         self.assertEquals(settings.timeout, 30)
         self.assertIsNone(settings.bundler)
