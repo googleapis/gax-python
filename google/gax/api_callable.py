@@ -371,53 +371,51 @@ def construct_settings(
     return defaults
 
 
-class ApiCallable(object):
-    """Represents zero or more API calls, with options to retry or perform
-    page streaming.
+def create_api_call(func, settings):
+    """Converts an rpc call into an API call governed by the settings.
 
-    Calling an object of ApiCallable type causes these calls to be transmitted.
+    In typical usage, ``func`` will be a callable used to make an rpc request.
+    This will mostly likely be a bound method from a request stub used to make
+    an rpc call.
+
+    The result is created by applying a series of function decorators defined
+    in this module to ``func``.  ``settings`` is used to determine which
+    function decorators to apply.
+
+    The result is another callable which for most values of ``settings`` has
+    has the same signature as the original. Only when ``settings`` configures
+    bundling does the signature change.
+
+    Args:
+      func (callable[[object], object]): is used to make a bare rpc call
+      settings (:class:`CallSettings`): provides the settings for this call
+
+    Returns:
+      func (callable[[object], object]): a bound method on a request stub used
+        to make an rpc call
+
+    Raises:
+       ValueError: if ``settings`` has incompatible values, e.g, if bundling
+         and page_streaming are both configured
+
     """
-    # pylint: disable=too-few-public-methods
-    def __init__(self, func, settings):
-        """Constructor.
+    if settings.retry and settings.retry.retry_codes:
+        api_call = _retryable(func, settings.retry)
+    else:
+        api_call = _add_timeout_arg(func, settings.timeout)
 
-        Args:
-            func: The API call that this ApiCallable wraps.
-            settings: A gax.CallSettings object from which the settings for this
-                call are drawn.
+    if settings.page_descriptor:
+        if settings.bundler and settings.bundle_descriptor:
+            raise ValueError('ApiCallable has incompatible settings: '
+                             'bundling and page streaming')
+        return _page_streamable(
+            api_call,
+            settings.page_descriptor.request_page_token_field,
+            settings.page_descriptor.response_page_token_field,
+            settings.page_descriptor.resource_field)
 
-        Returns:
-            An ApiCallable object.
-        """
-        self.func = func
-        self.settings = settings
+    if settings.bundler and settings.bundle_descriptor:
+        return _bundleable(api_call, settings.bundle_descriptor,
+                           settings.bundler)
 
-    def __call__(self, *args, **kwargs):
-        the_func = self.func
-
-        # Update the_func using each of the applicable function decorators
-        # before calling.
-
-        # Note that the retrying decorator handles timeouts; otherwise, it
-        # explicit partial application of the timeout argument is required.
-        if self.settings.retry and self.settings.retry.retry_codes:
-            the_func = _retryable(the_func, self.settings.retry)
-        else:
-            the_func = _add_timeout_arg(the_func, self.settings.timeout)
-
-        if self.settings.page_descriptor:
-            if self.settings.bundler and self.settings.bundle_descriptor:
-                raise ValueError('ApiCallable has incompatible settings: '
-                                 'bundling and page streaming')
-            the_func = _page_streamable(
-                the_func,
-                self.settings.page_descriptor.request_page_token_field,
-                self.settings.page_descriptor.response_page_token_field,
-                self.settings.page_descriptor.resource_field)
-        else:
-            if self.settings.bundler and self.settings.bundle_descriptor:
-                the_func = _bundleable(
-                    the_func, self.settings.bundle_descriptor,
-                    self.settings.bundler)
-
-        return the_func(*args, **kwargs)
+    return api_call
