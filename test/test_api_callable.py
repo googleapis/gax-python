@@ -328,8 +328,9 @@ class TestApiCallable(unittest2.TestCase):
 
     def test_construct_settings(self):
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, _BUNDLE_DESCRIPTORS, _PAGE_DESCRIPTORS,
-            dict(), dict(), _RETRY_DICT, 30)
+            _SERVICE_NAME, _A_CONFIG, dict(), dict(), _RETRY_DICT, 30,
+            bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
         self.assertEquals(settings.timeout, 30)
         self.assertIsInstance(settings.bundler, bundling.Executor)
@@ -347,8 +348,9 @@ class TestApiCallable(unittest2.TestCase):
         _bundling_override = {'bundling_method': None}
         _retry_override = {'page_streaming_method': None}
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, _BUNDLE_DESCRIPTORS, _PAGE_DESCRIPTORS,
-            _bundling_override, _retry_override, _RETRY_DICT, 30)
+            _SERVICE_NAME, _A_CONFIG, _bundling_override, _retry_override,
+            _RETRY_DICT, 30, bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
         self.assertEquals(settings.timeout, 30)
         self.assertIsNone(settings.bundler)

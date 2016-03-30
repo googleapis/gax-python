@@ -274,8 +274,8 @@ def _construct_retry(
 
 
 def construct_settings(
-        service_name, client_config, bundle_descriptors, page_descriptors,
-        bundling_override, retry_override, retry_names, timeout):
+        service_name, client_config, bundling_override, retry_override,
+        retry_names, timeout, bundle_descriptors=None, page_descriptors=None):
     """Constructs a dictionary mapping method names to CallSettings.
 
     The ``client_config`` parameter is parsed from a client configuration JSON
@@ -341,6 +341,8 @@ def construct_settings(
       timeout: The timeout parameter for all API calls in this dictionary.
     """
     defaults = dict()
+    bundle_descriptors = bundle_descriptors or {}
+    page_descriptors = page_descriptors or {}
 
     try:
         service_config = client_config['interfaces'][service_name]
