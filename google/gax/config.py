@@ -71,3 +71,7 @@ the client constants configuration for retrying into the correct gRPC objects.
 
 create_stub = grpc.create_stub  # pylint: disable=invalid-name,
 """The function to use to create stubs."""
+
+
+API_ERRORS = grpc.API_ERRORS
+"""Errors that indicate that an RPC was aborted."""

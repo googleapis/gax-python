@@ -31,11 +31,12 @@
 
 from __future__ import absolute_import, division
 import random
+import sys
 import time
 
 from . import (BackoffSettings, BundleOptions, bundling, CallSettings, config,
-               OPTION_INHERIT, RetryOptions, RetryException)
-
+               OPTION_INHERIT, RetryOptions)
+from .errors import GaxError, RetryError
 
 _MILLIS_PER_SECOND = 1000
 
@@ -96,8 +97,8 @@ def _retryable(a_func, retry):
         delay = retry.backoff_settings.initial_retry_delay_millis
         timeout = (retry.backoff_settings.initial_rpc_timeout_millis /
                    _MILLIS_PER_SECOND)
-        exc = RetryException('Retry total timeout exceeded before any'
-                             'response was received')
+        exc = RetryError('Retry total timeout exceeded before any'
+                         'response was received')
         now = time.time()
         deadline = now + total_timeout
 
@@ -109,10 +110,13 @@ def _retryable(a_func, retry):
             # pylint: disable=broad-except
             except Exception as exception:
                 if config.exc_to_code(exception) not in retry.retry_codes:
-                    raise
+                    raise RetryError(
+                        'Exception occurred in retry method that was not'
+                        'classified as transient', exception)
 
                 # pylint: disable=redefined-variable-type
-                exc = exception
+                exc = RetryError('Retry total timeout exceeded with exception',
+                                 exception)
                 to_sleep = random.uniform(0, delay)
                 time.sleep(to_sleep / _MILLIS_PER_SECOND)
                 now = time.time()
@@ -339,6 +343,10 @@ def construct_settings(
       retry_names: A dictionary mapping the strings referring to response status
         codes to the Python objects representing those codes.
       timeout: The timeout parameter for all API calls in this dictionary.
+
+    Raises:
+      KeyError: If the configuration for the service in question cannot be
+        located in the provided ``client_config``.
     """
     defaults = dict()
     bundle_descriptors = bundle_descriptors or {}
@@ -369,6 +377,28 @@ def construct_settings(
             bundler=bundler, bundle_descriptor=bundle_descriptor)
 
     return defaults
+
+
+def _catch_errors(a_func, errors):
+    """Updates a_func to wrap exceptions with GaxError
+
+    Args:
+        a_func (callable): A callable.
+        retry (list[Exception]): Configures the exceptions to wrap.
+
+    Returns:
+        A function that will wrap certain exceptions with GaxError
+    """
+    def inner(*args, **kwargs):
+        """Wraps specified exceptions"""
+        try:
+            return a_func(*args, **kwargs)
+        # pylint: disable=catching-non-exception
+        except tuple(errors) as exception:
+            raise (GaxError('RPC failed', cause=exception), None,
+                   sys.exc_info()[2])
+
+    return inner
 
 
 def create_api_call(func, settings):
@@ -418,4 +448,4 @@ def create_api_call(func, settings):
         return _bundleable(api_call, settings.bundle_descriptor,
                            settings.bundler)
 
-    return api_call
+    return _catch_errors(api_call, config.API_ERRORS)
