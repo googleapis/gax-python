@@ -36,7 +36,8 @@ import unittest2
 
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
-    CallSettings, PageDescriptor, RetryException, RetryOptions)
+    CallSettings, PageDescriptor, RetryOptions)
+from google.gax.errors import GaxError, RetryError
 
 
 _SERVICE_NAME = 'test.interface.v1.api'
@@ -105,14 +106,15 @@ class CustomException(Exception):
         self.code = code
 
 
+class AnotherException(Exception):
+    pass
+
+
 class TestCreateApiCallable(unittest2.TestCase):
 
-    def create_api_call(self, *args, **kwargs):
-        return api_callable.create_api_call(*args, **kwargs)
-
-    def test_call_api_callable(self):
+    def test_call_api_call(self):
         settings = CallSettings()
-        my_callable = self.create_api_call(
+        my_callable = api_callable.create_api_call(
             lambda _req, _timeout: 42, settings)
         self.assertEqual(my_callable(None), 42)
 
@@ -132,7 +134,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call.return_value = 1729
         mock_time.return_value = 0
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(mock_call, settings)
+        my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertEqual(my_callable(None), 1729)
         self.assertEqual(mock_call.call_count, to_attempt)
 
@@ -145,7 +147,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_time.return_value = 0
 
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(mock_call, settings)
+        my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertRaises(CustomException, my_callable, None)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -161,8 +163,12 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_time.side_effect = [0, 2]
         mock_exc_to_code.side_effect = lambda e: e.code
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(fake_call, settings)
-        self.assertRaises(CustomException, my_callable, None)
+        my_callable = api_callable.create_api_call(fake_call, settings)
+
+        try:
+            my_callable(None)
+        except RetryError as exc:
+            self.assertIsInstance(exc.cause, CustomException)
 
     @mock.patch('time.time')
     @mock.patch('google.gax.config.exc_to_code')
@@ -176,8 +182,13 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
         mock_time.side_effect = ([0] * to_attempt + [2])
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(mock_call, settings)
-        self.assertRaises(CustomException, my_callable, None)
+        my_callable = api_callable.create_api_call(mock_call, settings)
+
+        try:
+            my_callable(None)
+        except RetryError as exc:
+            self.assertIsInstance(exc.cause, CustomException)
+
         self.assertEqual(mock_call.call_count, to_attempt)
 
     @mock.patch('time.time')
@@ -192,7 +203,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_2)
         mock_time.return_value = 0
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(mock_call, settings)
+        my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertRaises(Exception, my_callable, None)
         self.assertEqual(mock_call.call_count, 1)
 
@@ -203,9 +214,9 @@ class TestCreateApiCallable(unittest2.TestCase):
             [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 0))
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(lambda: None, settings)
+        my_callable = api_callable.create_api_call(lambda: None, settings)
 
-        self.assertRaises(RetryException, my_callable, None)
+        self.assertRaises(RetryError, my_callable, None)
 
     @mock.patch('time.sleep')
     @mock.patch('time.time')
@@ -231,18 +242,13 @@ class TestCreateApiCallable(unittest2.TestCase):
         params = BackoffSettings(3, 2, 24, 5, 2, 80, 2500)
         retry = RetryOptions([_FAKE_STATUS_CODE_1], params)
         settings = CallSettings(timeout=0, retry=retry)
-        my_callable = self.create_api_call(mock_call, settings)
+        my_callable = api_callable.create_api_call(mock_call, settings)
 
-        # Necessary to retrieve timeout info from ``api_call``
         try:
             my_callable(None)
-        # pylint: disable=broad-except
-        except Exception as exc:
-            exception = exc
-        else:
-            exception = None
+        except RetryError as exc:
+            self.assertIsInstance(exc.cause, CustomException)
 
-        self.assertIsInstance(exception, CustomException)
         self.assertGreaterEqual(mock_time(),
                                 params.total_timeout_millis / MILLIS_PER_SEC)
 
@@ -294,7 +300,7 @@ class TestCreateApiCallable(unittest2.TestCase):
             mock_grpc.side_effect = grpc_return_value
             settings = CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0)
-            my_callable = self.create_api_call(mock_grpc, settings=settings)
+            my_callable = api_callable.create_api_call(mock_grpc, settings=settings)
             self.assertEqual(list(my_callable(PageStreamingRequest())),
                              list(range(page_size * pages_to_stream)))
 
@@ -303,7 +309,7 @@ class TestCreateApiCallable(unittest2.TestCase):
             page_descriptor=object(), bundle_descriptor=object(),
             bundler=object())
         with self.assertRaises(ValueError):
-            self.create_api_call(lambda _req, _timeout: 42, settings)
+            api_callable.create_api_call(lambda _req, _timeout: 42, settings)
 
     def test_bundling(self):
         # pylint: disable=abstract-method, too-few-public-methods
@@ -320,7 +326,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         settings = CallSettings(
             bundler=bundler, bundle_descriptor=fake_grpc_func_descriptor,
             timeout=0)
-        my_callable = self.create_api_call(my_func, settings)
+        my_callable = api_callable.create_api_call(my_func, settings)
         first = my_callable(BundlingRequest([0] * 3))
         self.assertIsInstance(first, bundling.Event)
         self.assertIsNone(first.result)  # pylint: disable=no-member
@@ -360,3 +366,19 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertEquals(settings.timeout, 30)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
         self.assertIsNone(settings.retry)
+
+    @mock.patch('google.gax.config.API_ERRORS', (CustomException, ))
+    def test_catch_error(self):
+        def abortion_error_func(*dummy_args, **dummy_kwargs):
+            raise CustomException(None, None)
+
+        def other_error_func(*dummy_args, **dummy_kwargs):
+            raise AnotherException
+
+        gax_error_callable = api_callable.create_api_call(
+            abortion_error_func, CallSettings())
+        self.assertRaises(GaxError, gax_error_callable, None)
+
+        other_error_callable = api_callable.create_api_call(
+            other_error_func, CallSettings())
+        self.assertRaises(AnotherException, other_error_callable, None)

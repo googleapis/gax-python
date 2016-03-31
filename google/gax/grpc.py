@@ -31,7 +31,12 @@
 
 from __future__ import absolute_import
 from grpc.beta import implementations
+from grpc.framework.interfaces.face import face
 from . import auth
+
+
+API_ERRORS = (face.AbortionError, )
+"""gRPC exceptions that indicate that an RPC was aborted."""
 
 
 def _make_grpc_auth_func(auth_func):
