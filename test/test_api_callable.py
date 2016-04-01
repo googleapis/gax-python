@@ -62,7 +62,8 @@ _A_CONFIG = {
                 }
             },
             'methods': {
-                'bundling_method': {
+                # Note that GAX should normalize this to snake case
+                'BundlingMethod': {
                     'retry_codes_name': 'foo_retry',
                     'retry_params_name': 'default',
                     'bundling': {
