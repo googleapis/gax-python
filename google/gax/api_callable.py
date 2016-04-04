@@ -277,6 +277,19 @@ def _construct_retry(
     return retry
 
 
+def _upper_camel_to_lower_under(string):
+    if not string:
+        return ''
+    out = ''
+    out += string[0].lower()
+    for char in string[1:]:
+        if char.isupper():
+            out += '_' + char.lower()
+        else:
+            out += char
+    return out
+
+
 def construct_settings(
         service_name, client_config, bundling_override, retry_override,
         retry_names, timeout, bundle_descriptors=None, page_descriptors=None):
@@ -348,6 +361,7 @@ def construct_settings(
       KeyError: If the configuration for the service in question cannot be
         located in the provided ``client_config``.
     """
+    # pylint: disable=too-many-locals
     defaults = dict()
     bundle_descriptors = bundle_descriptors or {}
     page_descriptors = page_descriptors or {}
@@ -360,20 +374,21 @@ def construct_settings(
 
     for method in service_config.get('methods'):
         method_config = service_config['methods'][method]
+        snake_name = _upper_camel_to_lower_under(method)
 
-        bundle_descriptor = bundle_descriptors.get(method)
+        bundle_descriptor = bundle_descriptors.get(snake_name)
         bundler = _construct_bundling(
-            method_config, bundling_override.get(method, OPTION_INHERIT),
+            method_config, bundling_override.get(snake_name, OPTION_INHERIT),
             bundle_descriptor)
 
         retry = _construct_retry(
-            method_config, retry_override.get(method, OPTION_INHERIT),
+            method_config, retry_override.get(snake_name, OPTION_INHERIT),
             service_config['retry_codes'], service_config['retry_params'],
             retry_names)
 
-        defaults[method] = CallSettings(
+        defaults[snake_name] = CallSettings(
             timeout=timeout, retry=retry,
-            page_descriptor=page_descriptors.get(method),
+            page_descriptor=page_descriptors.get(snake_name),
             bundler=bundler, bundle_descriptor=bundle_descriptor)
 
     return defaults
