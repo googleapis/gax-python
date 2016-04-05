@@ -112,7 +112,7 @@ def _retryable(a_func, retry):
                 if config.exc_to_code(exception) not in retry.retry_codes:
                     raise RetryError(
                         'Exception occurred in retry method that was not'
-                        'classified as transient', exception)
+                        ' classified as transient', exception)
 
                 # pylint: disable=redefined-variable-type
                 exc = RetryError('Retry total timeout exceeded with exception',
