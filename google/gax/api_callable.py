@@ -214,8 +214,14 @@ def _construct_bundling(method_config, method_bundling_override,
     if 'bundling' in method_config and bundle_descriptor:
 
         if method_bundling_override == OPTION_INHERIT:
+            params = method_config['bundling']
             bundler = bundling.Executor(BundleOptions(
-                **method_config['bundling']))
+                element_count_threshold=params.get(
+                    'element_count_threshold', 0),
+                element_count_limit=params.get('element_count_limit', 0),
+                request_byte_threshold=params.get('request_byte_threshold', 0),
+                request_byte_limit=params.get('request_byte_limit', 0),
+                delay_threshold=params.get('delay_threshold_millis', 0)))
         elif method_bundling_override:
             bundler = bundling.Executor(method_bundling_override)
         else:
