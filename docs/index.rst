@@ -21,6 +21,7 @@ based on `GRPC`_ and `Google APIs`_ conventions.
    google.gax.api_callable
    google.gax.bundling
    google.gax.config
+   google.gax.errors
    google.gax.grpc
    google.gax.path_template
 
