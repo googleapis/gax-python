@@ -31,12 +31,42 @@
 
 from __future__ import absolute_import
 from grpc.beta import implementations
+from grpc.beta.interfaces import StatusCode
 from grpc.framework.interfaces.face import face
 from . import auth
 
 
 API_ERRORS = (face.AbortionError, )
 """gRPC exceptions that indicate that an RPC was aborted."""
+
+
+STATUS_CODE_NAMES = {
+    'ABORTED': StatusCode.ABORTED,
+    'CANCELLED': StatusCode.CANCELLED,
+    'DATA_LOSS': StatusCode.DATA_LOSS,
+    'DEADLINE_EXCEEDED': StatusCode.DEADLINE_EXCEEDED,
+    'FAILED_PRECONDITION': StatusCode.FAILED_PRECONDITION,
+    'INTERNAL': StatusCode.INTERNAL,
+    'INVALID_ARGUMENT': StatusCode.INVALID_ARGUMENT,
+    'NOT_FOUND': StatusCode.NOT_FOUND,
+    'OUT_OF_RANGE': StatusCode.OUT_OF_RANGE,
+    'PERMISSION_DENIED': StatusCode.PERMISSION_DENIED,
+    'RESOURCE_EXHAUSTED': StatusCode.RESOURCE_EXHAUSTED,
+    'UNAUTHENTICATED': StatusCode.UNAUTHENTICATED,
+    'UNAVAILABLE': StatusCode.UNAVAILABLE,
+    'UNIMPLEMENTED': StatusCode.UNIMPLEMENTED,
+    'UNKNOWN': StatusCode.UNKNOWN}
+"""Maps strings used in client config to gRPC status codes."""
+
+
+def exc_to_code(exc):
+    """Retrieves the status code from an exception"""
+    if not isinstance(exc, face.AbortionError):
+        return None
+    elif isinstance(exc, face.ExpirationError):
+        return StatusCode.DEADLINE_EXCEEDED
+    else:
+        return getattr(exc, 'code', None)
 
 
 def _make_grpc_auth_func(auth_func):

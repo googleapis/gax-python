@@ -31,38 +31,18 @@
 
 from __future__ import absolute_import
 
-from grpc.beta.interfaces import StatusCode
-from grpc.framework.interfaces.face import face
 from . import grpc
 
 
-def exc_to_code(exc):
-    """Retrieves the status code from an exception"""
-    if not isinstance(exc, face.AbortionError):
-        return None
-    elif isinstance(exc, face.ExpirationError):
-        return StatusCode.DEADLINE_EXCEEDED
-    else:
-        return getattr(exc, 'code', None)
+exc_to_code = grpc.exc_to_code  # pylint: disable=invalid-name
+"""A function that takes an exception and returns a status code.
+
+May return None if the exception is not associated with a status code.
+"""
 
 
-STATUS_CODE_NAMES = {
-    'ABORTED': StatusCode.ABORTED,
-    'CANCELLED': StatusCode.CANCELLED,
-    'DATA_LOSS': StatusCode.DATA_LOSS,
-    'DEADLINE_EXCEEDED': StatusCode.DEADLINE_EXCEEDED,
-    'FAILED_PRECONDITION': StatusCode.FAILED_PRECONDITION,
-    'INTERNAL': StatusCode.INTERNAL,
-    'INVALID_ARGUMENT': StatusCode.INVALID_ARGUMENT,
-    'NOT_FOUND': StatusCode.NOT_FOUND,
-    'OUT_OF_RANGE': StatusCode.OUT_OF_RANGE,
-    'PERMISSION_DENIED': StatusCode.PERMISSION_DENIED,
-    'RESOURCE_EXHAUSTED': StatusCode.RESOURCE_EXHAUSTED,
-    'UNAUTHENTICATED': StatusCode.UNAUTHENTICATED,
-    'UNAVAILABLE': StatusCode.UNAVAILABLE,
-    'UNIMPLEMENTED': StatusCode.UNIMPLEMENTED,
-    'UNKNOWN': StatusCode.UNKNOWN}
-"""Maps strings to the status codes they represent.
+STATUS_CODE_NAMES = grpc.STATUS_CODE_NAMES
+"""Maps strings used in client config to the status codes they represent.
 
 This is necessary for google.gax.api_callable.construct_settings to translate
 the client constants configuration for retrying into the correct gRPC objects.
