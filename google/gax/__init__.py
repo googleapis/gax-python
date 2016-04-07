@@ -163,8 +163,8 @@ class RetryOptions(
     """Per-call configurable settings for retrying upon transient failure.
 
     Attributes:
-      retry_codes (list[string]): a list of exception codes upon which a retry
-        should be attempted.
+      retry_codes (list[string]): a list of Google API canonical error codes
+        upon which a retry should be attempted.
       backoff_settings (:class:`BackoffSettings`): configures the retry
         exponential backoff algorithm.
     """
