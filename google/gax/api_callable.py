@@ -457,7 +457,7 @@ def create_api_call(func, settings):
 
     if settings.page_descriptor:
         if settings.bundler and settings.bundle_descriptor:
-            raise ValueError('ApiCallable has incompatible settings: '
+            raise ValueError('The API call has incompatible settings: '
                              'bundling and page streaming')
         return _page_streamable(
             api_call,
