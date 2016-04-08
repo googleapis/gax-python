@@ -45,7 +45,7 @@ settings."""
 
 
 class CallSettings(object):
-    """Encapsulates the call settings for an ApiCallable"""
+    """Encapsulates the call settings for an API call."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, retry=None, page_descriptor=None,
                  bundler=None, bundle_descriptor=None):
@@ -54,18 +54,15 @@ class CallSettings(object):
         Args:
             timeout (int): The client-side timeout for API calls. This
               parameter is ignored for retrying calls.
-            retry (RetryOptions): The configuration for retrying upon transient
-              error. If set to None, this call will not retry.
-            page_descriptor (PageDescriptor): indicates the structure of page
-              streaming to be performed. If set to None, page streaming is
-              not performed.
-            bundler (bundle.Executor): orchestrates bundling. If None, bundling
-              is not performed.
-            bundle_descriptor (BundleDescriptor): indicates the structure of
-              the bundle. If None, bundling is not performed.
-
-        Returns:
-            A CallSettings object.
+            retry (:class:`RetryOptions`): The configuration for retrying upon
+              transient error. If set to None, this call will not retry.
+            page_descriptor (:class:`PageDescriptor`): indicates the structure
+              of page streaming to be performed. If set to None, page streaming
+              is disabled.
+            bundler (:class:`gax.bundling.Executor`): orchestrates bundling. If
+              None, bundling is not performed.
+            bundle_descriptor (:class:`BundleDescriptor`): indicates the
+              structure of of the bundle. If None, bundling is disabled.
         """
         self.timeout = timeout
         self.retry = retry
@@ -77,11 +74,12 @@ class CallSettings(object):
         """Returns a new CallSettings merged from this and a CallOptions object.
 
         Args:
-            options: A CallOptions object whose values are override those in
-              this object. If None, `merge` returns a copy of this object.
+            options (:class:`CallOptions`): an instance whose values override
+              those in this object. If None, ``merge`` returns a copy of this
+              object
 
         Returns:
-            A CallSettings object.
+            A :class:`CallSettings` object.
         """
         if not options:
             return CallSettings(
@@ -111,21 +109,36 @@ class CallSettings(object):
 
 
 class CallOptions(object):
-    """Encapsulates the overridable settings for a particular API call"""
+    """Encapsulates the overridable settings for a particular API call.
+
+    ``CallOptions`` is an optional arg for all GAX API calls.  It is used to
+    configure the settings of a specific API call.
+
+    When provided, its values override the GAX service defaults for that
+    particular call.
+
+    """
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
                  is_page_streaming=OPTION_INHERIT):
         """Constructor.
 
+        Example:
+           >>> # change an api call's timeout
+           >>> o1 = CallOptions(timeout=30)  # make the timeout 30 seconds
+           >>>
+           >>> # disable page streaming on an api call that normally supports it
+           >>> o2 = CallOptions(page_streaming=False)
+           >>>
+           >>> # disable retrying on an api call that normally retries
+           >>> o3 = CallOptions(retry=None)
+
         Args:
             timeout (int): The client-side timeout for API calls.
-            retry (RetryOptions): The configuration for retrying upon transient error.
-              If set to None, this call will not retry.
+            retry (:class:`RetryOptions`): determines whether and how to retry
+              on transient errors. When set to None, the call will not retry.
             is_page_streaming (bool): If set and the call is configured for page
               streaming, page streaming is performed.
-
-        Returns:
-            A CallOptions object.
         """
         self.timeout = timeout
         self.retry = retry
@@ -150,8 +163,9 @@ class RetryOptions(
     """Per-call configurable settings for retrying upon transient failure.
 
     Attributes:
-      retry_codes: a list of exceptions upon which a retry should be attempted.
-      backoff_settings: a BackoffSettings object configuring the retry
+      retry_codes (list[string]): a list of Google API canonical error codes
+        upon which a retry should be attempted.
+      backoff_settings (:class:`BackoffSettings`): configures the retry
         exponential backoff algorithm.
     """
     pass
