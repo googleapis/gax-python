@@ -45,7 +45,7 @@ settings."""
 
 
 class CallSettings(object):
-    """Encapsulates the call settings for an API call"""
+    """Encapsulates the call settings for an API call."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, retry=None, page_descriptor=None,
                  bundler=None, bundle_descriptor=None):
@@ -58,7 +58,7 @@ class CallSettings(object):
               transient error. If set to None, this call will not retry.
             page_descriptor (:class:`PageDescriptor`): indicates the structure
               of page streaming to be performed. If set to None, page streaming
-              is disabled
+              is disabled.
             bundler (:class:`gax.bundling.Executor`): orchestrates bundling. If
               None, bundling is not performed.
             bundle_descriptor (:class:`BundleDescriptor`): indicates the
@@ -75,7 +75,7 @@ class CallSettings(object):
 
         Args:
             options (:class:`CallOptions`): an instance whose values override
-              those in this object. If None, `merge` returns a copy of this
+              those in this object. If None, ``merge`` returns a copy of this
               object
 
         Returns:
@@ -111,7 +111,7 @@ class CallSettings(object):
 class CallOptions(object):
     """Encapsulates the overridable settings for a particular API call.
 
-    ``CallOptions`` are an optional arg for all GAX API calls.  They are used to
+    ``CallOptions`` is an optional arg for all GAX API calls.  It is used to
     configure the settings of a specific API call.
 
     When provided, its values override the GAX service defaults for that
@@ -130,7 +130,7 @@ class CallOptions(object):
            >>> # disable page streaming on an api call that normally supports it
            >>> o2 = CallOptions(page_streaming=False)
            >>>
-           >>> # disable retrys on an api call that normally retries
+           >>> # disable retrying on an api call that normally retries
            >>> o3 = CallOptions(retry=None)
 
         Args:
