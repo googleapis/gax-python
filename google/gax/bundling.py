@@ -150,9 +150,9 @@ class Task(object):
         if len(self._in_deque) == 0:
             return
         req = self._bundling_request
-        setattr(req,
-                self.bundled_field,
-                [e for elts in self._in_deque for e in elts])
+        del getattr(req, self.bundled_field)[:]
+        getattr(req, self.bundled_field).extend(
+            [e for elts in self._in_deque for e in elts])
 
         subresponse_field = self.subresponse_field
         if subresponse_field:
@@ -212,6 +212,10 @@ class Task(object):
         Returns:
            an :class:`Event` that can be used to wait on the response.
         """
+        # Use a copy, not a reference, as it is later necessary to mutate
+        # the proto field from which elts are drawn in order to construct
+        # the bundled request.
+        elts = elts[:]
         self._in_deque.append(elts)
         event = self._event_for(elts)
         self._event_deque.append(event)
