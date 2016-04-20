@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.9.4'
+__version__ = '0.10.0'
 
 
 OPTION_INHERIT = object()
@@ -102,9 +102,14 @@ class CallSettings(object):
             else:
                 page_descriptor = None
 
+            if options.is_bundling:
+                bundler = self.bundler
+            else:
+                bundler = None
+
             return CallSettings(
                 timeout=timeout, retry=retry,
-                page_descriptor=page_descriptor, bundler=self.bundler,
+                page_descriptor=page_descriptor, bundler=bundler,
                 bundle_descriptor=self.bundle_descriptor)
 
 
@@ -116,11 +121,10 @@ class CallOptions(object):
 
     When provided, its values override the GAX service defaults for that
     particular call.
-
     """
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
-                 is_page_streaming=OPTION_INHERIT):
+                 is_page_streaming=OPTION_INHERIT, is_bundling=False):
         """Constructor.
 
         Example:
@@ -132,6 +136,9 @@ class CallOptions(object):
            >>>
            >>> # disable retrying on an api call that normally retries
            >>> o3 = CallOptions(retry=None)
+           >>>
+           >>> # enable bundling on a call that supports it
+           >>> o4 = CallOptions(is_bundling=True)
 
         Args:
             timeout (int): The client-side timeout for API calls.
@@ -139,10 +146,13 @@ class CallOptions(object):
               on transient errors. When set to None, the call will not retry.
             is_page_streaming (bool): If set and the call is configured for page
               streaming, page streaming is performed.
+            is_bundling (bool): If set and the call is configured for bundling,
+              bundling is performed. Bundling is always disabled by default.
         """
         self.timeout = timeout
         self.retry = retry
         self.is_page_streaming = is_page_streaming
+        self.is_bundling = is_bundling
 
 
 class PageDescriptor(

@@ -135,7 +135,7 @@ def _make_a_test_task(api_call=_return_request):
         api_call,
         'an_id',
         'field1',
-        _Simple('dummy_value'),
+        _Simple([]),
         dict())
 
 
