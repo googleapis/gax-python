@@ -97,21 +97,21 @@ class TestPathTemplate(unittest2.TestCase):
         self.assertEqual({'$0': 'foo/foo', '$1': 'bar'},
                          template.match('bar/foo/foo/foo/bar'))
 
-    def test_instantiate_atomic_resource(self):
+    def test_render_atomic_resource(self):
         template = PathTemplate('buckets/*/*/*/objects/*')
-        url = template.instantiate({
+        url = template.render({
             '$0': 'f', '$1': 'o', '$2': 'o', '$3': 'google.com:a-b'})
         self.assertEqual(url, 'buckets/f/o/o/objects/google.com:a-b')
 
-    def test_instantiate_fail_when_too_few_variables(self):
+    def test_render_fail_when_too_few_variables(self):
         template = PathTemplate('buckets/*/*/*/objects/*')
         self.assertRaises(ValidationException,
-                          template.instantiate,
+                          template.render,
                           {'$0': 'f', '$1': 'l', '$2': 'o'})
 
-    def test_instantiate_with_unbound_in_middle(self):
+    def test_render_with_unbound_in_middle(self):
         template = PathTemplate('bar/**/foo/*')
-        url = template.instantiate({'$0': '1/2', '$1': '3'})
+        url = template.render({'$0': '1/2', '$1': '3'})
         self.assertEqual(url, 'bar/1/2/foo/3')
 
     def test_to_string(self):

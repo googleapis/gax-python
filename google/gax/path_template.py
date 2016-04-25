@@ -79,14 +79,14 @@ class PathTemplate(object):
     def __repr__(self):
         return _format(self.segments)
 
-    def instantiate(self, bindings):
-        """Instantiates a path template using the provided bindings.
+    def render(self, bindings):
+        """Renders a string from a path template using the provided bindings.
 
         Args:
             bindings (dict): A dictionary of var names to binding strings.
 
         Returns:
-            str: An instantiated representation of this path template.
+            str: The rendered instantiation of this path template.
 
         Raises:
             ValidationError: If a key isn't provided or if a sub-template can't
@@ -98,7 +98,7 @@ class PathTemplate(object):
             if segment.kind == _BINDING:
                 if segment.literal not in bindings:
                     raise ValidationException(
-                        ('instantiate error: value for key \'{}\' '
+                        ('rendering error: value for key \'{}\' '
                          'not provided').format(segment.literal))
                 out.extend(PathTemplate(bindings[segment.literal]).segments)
                 binding = True
@@ -152,7 +152,7 @@ class PathTemplate(object):
                 current_var = this[i].literal
         if j != len(that) or j != segment_count:
             raise ValidationException(
-                'match error: could not instantiate a path template from: {}'
+                'match error: could not render from the path template: {}'
                 .format(path))
         return bindings
 

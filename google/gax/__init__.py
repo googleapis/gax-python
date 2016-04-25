@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.10.0'
+__version__ = '0.10.1'
 
 
 OPTION_INHERIT = object()
