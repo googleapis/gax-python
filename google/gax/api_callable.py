@@ -164,18 +164,23 @@ def _bundleable(a_func, desc, bundler):
 def _page_streamable(a_func,
                      request_page_token_field,
                      response_page_token_field,
-                     resource_field):
+                     resource_field,
+                     flatten_pages=True):
     """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
-        a_func: an API call that is page streaming.
-        request_page_token_field: The field of the page token in the request.
-        response_page_token_field: The field of the next page token in the
-          response.
-        resource_field: The field to be streamed.
+        a_func (callable[[req], resp]): an API call that is page streaming.
+        request_page_token_field (str): The name of the field of the page token
+          in the request.
+        response_page_token_field (str): The name of the field of the next page
+          token in the response.
+        resource_field (str): The name of the field to be streamed.
+        flatten_pages (bool): Optional. If set, the returned iterable is over
+          ``resource_field``; otherwise the returned iterable is over the pages
+          of the response, each of which is an iterable over ``resource_field``.
 
     Returns:
-        A function that returns an iterable over the specified field.
+        A function that returns an iterable.
     """
 
     def inner(*args, **kwargs):
@@ -183,8 +188,11 @@ def _page_streamable(a_func,
         request = args[0]
         while True:
             response = a_func(request, **kwargs)
-            for obj in getattr(response, resource_field):
-                yield obj
+            if flatten_pages:
+                for obj in getattr(response, resource_field):
+                    yield obj
+            else:
+                yield getattr(response, resource_field)
             next_page_token = getattr(response, response_page_token_field)
             if not next_page_token:
                 break
@@ -459,11 +467,16 @@ def create_api_call(func, settings):
         if settings.bundler and settings.bundle_descriptor:
             raise ValueError('The API call has incompatible settings: '
                              'bundling and page streaming')
+        if settings.flatten_pages is None:
+            flatten_pages = True
+        else:
+            flatten_pages = settings.flatten_pages
         return _page_streamable(
             api_call,
             settings.page_descriptor.request_page_token_field,
             settings.page_descriptor.response_page_token_field,
-            settings.page_descriptor.resource_field)
+            settings.page_descriptor.resource_field,
+            flatten_pages=flatten_pages)
 
     if settings.bundler and settings.bundle_descriptor:
         return _bundleable(api_call, settings.bundle_descriptor,

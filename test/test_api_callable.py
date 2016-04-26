@@ -287,13 +287,13 @@ class TestCreateApiCallable(unittest2.TestCase):
             if (request.page_token > 0 and
                     request.page_token < page_size * pages_to_stream):
                 return PageStreamingResponse(
-                    nums=iter(range(request.page_token,
+                    nums=list(range(request.page_token,
                                     request.page_token + page_size)),
                     next_page_token=request.page_token + page_size)
             elif request.page_token >= page_size * pages_to_stream:
                 return PageStreamingResponse()
             else:
-                return PageStreamingResponse(nums=iter(range(page_size)),
+                return PageStreamingResponse(nums=list(range(page_size)),
                                              next_page_token=page_size)
 
         with mock.patch('grpc.framework.crust.implementations.'
@@ -301,9 +301,22 @@ class TestCreateApiCallable(unittest2.TestCase):
             mock_grpc.side_effect = grpc_return_value
             settings = CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0)
-            my_callable = api_callable.create_api_call(mock_grpc, settings=settings)
+            my_callable = api_callable.create_api_call(
+                mock_grpc, settings=settings)
             self.assertEqual(list(my_callable(PageStreamingRequest())),
                              list(range(page_size * pages_to_stream)))
+
+            unflattened_settings = CallSettings(
+                page_descriptor=fake_grpc_func_descriptor, timeout=0,
+                flatten_pages=False)
+            unflattened_callable = api_callable.create_api_call(
+                mock_grpc, settings=unflattened_settings)
+            # Expect a list of pages_to_stream pages, each of size page_size,
+            # plus one empty page
+            expected = [list(range(page_size * n, page_size * (n + 1)))
+                        for n in range(pages_to_stream)] + [()]
+            self.assertEqual(list(unflattened_callable(PageStreamingRequest())),
+                             expected)
 
     def test_bundling_page_streaming_error(self):
         settings = CallSettings(

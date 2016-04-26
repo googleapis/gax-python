@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.10.1'
+__version__ = '0.10.2'
 
 
 OPTION_INHERIT = object()
@@ -48,7 +48,7 @@ class CallSettings(object):
     """Encapsulates the call settings for an API call."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, retry=None, page_descriptor=None,
-                 bundler=None, bundle_descriptor=None):
+                 flatten_pages=None, bundler=None, bundle_descriptor=None):
         """Constructor.
 
         Args:
@@ -59,6 +59,10 @@ class CallSettings(object):
             page_descriptor (:class:`PageDescriptor`): indicates the structure
               of page streaming to be performed. If set to None, page streaming
               is disabled.
+            flatten_pages (bool): If there is no page_descriptor, this attrbute
+              has no meaning. Otherwise, determines whether a page streamed
+              response should make the page structure transparent to the user by
+              flattening the repeated field in the returned generator.
             bundler (:class:`gax.bundling.Executor`): orchestrates bundling. If
               None, bundling is not performed.
             bundle_descriptor (:class:`BundleDescriptor`): indicates the
@@ -67,6 +71,7 @@ class CallSettings(object):
         self.timeout = timeout
         self.retry = retry
         self.page_descriptor = page_descriptor
+        self.flatten_pages = flatten_pages
         self.bundler = bundler
         self.bundle_descriptor = bundle_descriptor
 
@@ -97,10 +102,10 @@ class CallSettings(object):
             else:
                 retry = options.retry
 
-            if options.is_page_streaming:
-                page_descriptor = self.page_descriptor
+            if options.is_page_streaming == OPTION_INHERIT:
+                flatten_pages = self.flatten_pages
             else:
-                page_descriptor = None
+                flatten_pages = options.is_page_streaming
 
             if options.is_bundling:
                 bundler = self.bundler
@@ -109,7 +114,8 @@ class CallSettings(object):
 
             return CallSettings(
                 timeout=timeout, retry=retry,
-                page_descriptor=page_descriptor, bundler=bundler,
+                page_descriptor=self.page_descriptor,
+                flatten_pages=flatten_pages, bundler=bundler,
                 bundle_descriptor=self.bundle_descriptor)
 
 
