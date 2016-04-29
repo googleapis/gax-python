@@ -163,7 +163,7 @@ class CallOptions(object):
            >>> o4 = CallOptions(is_bundling=True)
 
         Args:
-            timeout (int): The client-side timeout for API calls.
+            timeout (int): The client-side timeout for non-retrying API calls.
             retry (:class:`RetryOptions`): determines whether and how to retry
               on transient errors. When set to None, the call will not retry.
             page_token (str): If set and the call is configured for page
@@ -174,6 +174,9 @@ class CallOptions(object):
             is_bundling (bool): If set and the call is configured for bundling,
               bundling is performed. Bundling is always disabled by default.
         """
+        if not (timeout == OPTION_INHERIT or retry == OPTION_INHERIT):
+            raise ValueError('The CallOptions has incompatible settings: '
+                             '"timeout" cannot be specified on a retrying call')
         self.timeout = timeout
         self.retry = retry
         self.page_token = page_token
