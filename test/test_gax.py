@@ -40,11 +40,11 @@ from google.gax import (
 
 class TestBundleOptions(unittest2.TestCase):
 
-    def test_cannont_construct_with_noarg_options(self):
+    def test_cannot_construct_with_noarg_options(self):
         self.assertRaises(AssertionError,
                           BundleOptions)
 
-    def test_cannont_construct_with_bad_options(self):
+    def test_cannot_construct_with_bad_options(self):
         not_an_int = 'i am a string'
         self.assertRaises(AssertionError,
                           BundleOptions,
@@ -65,23 +65,27 @@ class TestCallSettings(unittest2.TestCase):
         self.assertEqual(options.retry, OPTION_INHERIT)
         self.assertEqual(options.is_page_streaming, OPTION_INHERIT)
 
+    def test_cannot_construct_bad_options(self):
+        self.assertRaises(
+            ValueError, CallOptions, timeout=47, retry=RetryOptions(None, None))
+
     def test_settings_merge_options1(self):
-        retry = RetryOptions(None, None)
-        options = CallOptions(timeout=46, retry=retry)
+        options = CallOptions(timeout=46)
         settings = CallSettings(timeout=9, page_descriptor=None, retry=None)
         final = settings.merge(options)
         self.assertEqual(final.timeout, 46)
-        self.assertEqual(final.retry, retry)
+        self.assertIsNone(final.retry)
         self.assertIsNone(final.page_descriptor)
 
     def test_settings_merge_options2(self):
-        options = CallOptions(retry=None)
+        retry = RetryOptions(None, None)
+        options = CallOptions(retry=retry)
         settings = CallSettings(
             timeout=9, page_descriptor=None, retry=RetryOptions(None, None))
         final = settings.merge(options)
         self.assertEqual(final.timeout, 9)
         self.assertIsNone(final.page_descriptor)
-        self.assertIsNone(final.retry)
+        self.assertEqual(final.retry, retry)
 
     def test_settings_merge_options_page_streaming(self):
         retry = RetryOptions(None, None)
