@@ -36,8 +36,8 @@ import collections
 __version__ = '0.10.2'
 
 
-INITIAL_PAGE = ''
-"""The page token passed into an initial paginated request."""
+INITIAL_PAGE = object()
+"""A placeholder for the page token passed into an initial paginated request."""
 
 
 OPTION_INHERIT = object()
@@ -393,7 +393,8 @@ class PageIterator(object):
             to ``INITIAL_PAGE``.
           request (object): The request to be passed to the API call. The page
             token field of the request is overwritten by the ``page_token``
-            passed to the constructor.
+            passed to the constructor, unless ``page_token`` is
+            ``INITIAL_PAGE``.
           **kwargs: Arbitrary keyword arguments to be passed to the API call.
 
         Returns:
@@ -414,9 +415,10 @@ class PageIterator(object):
         """Retrieves the next page."""
         if self._done:
             raise StopIteration
-        setattr(self._request,
-                self._page_descriptor.request_page_token_field,
-                self.page_token)
+        if self.page_token != INITIAL_PAGE:
+            setattr(self._request,
+                    self._page_descriptor.request_page_token_field,
+                    self.page_token)
         response = self._func(self._request, **self._kwargs)
         self.page_token = getattr(
             response, self._page_descriptor.response_page_token_field)

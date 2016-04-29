@@ -273,7 +273,7 @@ class TestCreateApiCallable(unittest2.TestCase):
 
         # pylint: disable=abstract-method, too-few-public-methods
         class PageStreamingRequest(object):
-            def __init__(self, page_token=INITIAL_PAGE):
+            def __init__(self, page_token=0):
                 self.page_token = page_token
 
         class PageStreamingResponse(object):
@@ -309,7 +309,7 @@ class TestCreateApiCallable(unittest2.TestCase):
 
             unflattened_settings = CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0,
-                flatten_pages=False)
+                flatten_pages=False, page_token=INITIAL_PAGE)
             unflattened_callable = api_callable.create_api_call(
                 mock_grpc, settings=unflattened_settings)
             # Expect a list of pages_to_stream pages, each of size page_size,
