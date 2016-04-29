@@ -33,7 +33,11 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.10.1'
+__version__ = '0.10.2'
+
+
+INITIAL_PAGE = object()
+"""A placeholder for the page token passed into an initial paginated request."""
 
 
 OPTION_INHERIT = object()
@@ -48,7 +52,8 @@ class CallSettings(object):
     """Encapsulates the call settings for an API call."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, retry=None, page_descriptor=None,
-                 bundler=None, bundle_descriptor=None):
+                 flatten_pages=None, page_token=None, bundler=None,
+                 bundle_descriptor=None):
         """Constructor.
 
         Args:
@@ -59,6 +64,14 @@ class CallSettings(object):
             page_descriptor (:class:`PageDescriptor`): indicates the structure
               of page streaming to be performed. If set to None, page streaming
               is disabled.
+            flatten_pages (bool): If there is no ``page_descriptor``, this
+              attrbute has no meaning. Otherwise, determines whether a page
+              streamed response should make the page structure transparent to
+              the user by flattening the repeated field in the returned
+              generator.
+            page_token (str): If there is no ``page_descriptor``, this attribute
+              has no meaning. Otherwise, determines the page token used in the
+              page streaming request.
             bundler (:class:`gax.bundling.Executor`): orchestrates bundling. If
               None, bundling is not performed.
             bundle_descriptor (:class:`BundleDescriptor`): indicates the
@@ -67,11 +80,17 @@ class CallSettings(object):
         self.timeout = timeout
         self.retry = retry
         self.page_descriptor = page_descriptor
+        self.flatten_pages = flatten_pages
+        self.page_token = page_token
         self.bundler = bundler
         self.bundle_descriptor = bundle_descriptor
 
     def merge(self, options):
         """Returns a new CallSettings merged from this and a CallOptions object.
+
+        Note that passing if the CallOptions instance specifies a page_token,
+        the merged CallSettings will have ``flatten_pages`` disabled. This
+        permits toggling per-resource/per-page page streaming.
 
         Args:
             options (:class:`CallOptions`): an instance whose values override
@@ -97,10 +116,12 @@ class CallSettings(object):
             else:
                 retry = options.retry
 
-            if options.is_page_streaming:
-                page_descriptor = self.page_descriptor
+            if options.page_token == OPTION_INHERIT:
+                flatten_pages = self.flatten_pages
+                page_token = self.page_token
             else:
-                page_descriptor = None
+                flatten_pages = False
+                page_token = options.page_token
 
             if options.is_bundling:
                 bundler = self.bundler
@@ -109,7 +130,8 @@ class CallSettings(object):
 
             return CallSettings(
                 timeout=timeout, retry=retry,
-                page_descriptor=page_descriptor, bundler=bundler,
+                page_descriptor=self.page_descriptor, page_token=page_token,
+                flatten_pages=flatten_pages, bundler=bundler,
                 bundle_descriptor=self.bundle_descriptor)
 
 
@@ -124,7 +146,7 @@ class CallOptions(object):
     """
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
-                 is_page_streaming=OPTION_INHERIT, is_bundling=False):
+                 page_token=OPTION_INHERIT, is_bundling=False):
         """Constructor.
 
         Example:
@@ -144,14 +166,17 @@ class CallOptions(object):
             timeout (int): The client-side timeout for API calls.
             retry (:class:`RetryOptions`): determines whether and how to retry
               on transient errors. When set to None, the call will not retry.
-            is_page_streaming (bool): If set and the call is configured for page
-              streaming, page streaming is performed.
+            page_token (str): If set and the call is configured for page
+              streaming, page streaming is performed per-page, starting with
+              this page_token. Use ``INITIAL_PAGE`` for the first request.
+              If unset and the call is configured for page streaming, page
+              streaming is performed per-resource.
             is_bundling (bool): If set and the call is configured for bundling,
               bundling is performed. Bundling is always disabled by default.
         """
         self.timeout = timeout
         self.retry = retry
-        self.is_page_streaming = is_page_streaming
+        self.page_token = page_token
         self.is_bundling = is_bundling
 
 
@@ -340,3 +365,63 @@ class BundleOptions(
             request_byte_threshold,
             request_byte_limit,
             delay_threshold)
+
+
+class PageIterator(object):
+    """An iterator over the pages of a page streaming API call.
+
+    Provides access to the individual pages of the call, as well as the page
+    token.
+
+    Attributes:
+      response: The full response message for the call most recently made, or
+        None if a call has not yet been made.
+      page_token: The page token to be passed in the request for the next call
+        to be made.
+    """
+    # pylint: disable=too-few-public-methods
+    def __init__(self, api_call, page_descriptor, page_token, request, **kwargs):
+        """Constructor.
+
+        Args:
+          api_call (callable[[req], resp]): an API call that is page
+            streaming.
+          page_descriptor (:class:`PageDescriptor`): indicates the structure
+            of page streaming to be performed.
+          page_token (str): The page token to be passed to API call request.
+            If no page token has yet been acquired, this field should be set
+            to ``INITIAL_PAGE``.
+          request (object): The request to be passed to the API call. The page
+            token field of the request is overwritten by the ``page_token``
+            passed to the constructor, unless ``page_token`` is
+            ``INITIAL_PAGE``.
+          **kwargs: Arbitrary keyword arguments to be passed to the API call.
+
+        Returns:
+          A PageIterator object.
+        """
+        self.response = None
+        self.page_token = page_token
+        self._func = api_call
+        self._page_descriptor = page_descriptor
+        self._request = request
+        self._kwargs = kwargs
+        self._done = False
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        """Retrieves the next page."""
+        if self._done:
+            raise StopIteration
+        if self.page_token != INITIAL_PAGE:
+            setattr(self._request,
+                    self._page_descriptor.request_page_token_field,
+                    self.page_token)
+        response = self._func(self._request, **self._kwargs)
+        self.page_token = getattr(
+            response, self._page_descriptor.response_page_token_field)
+        if not self.page_token:
+            self._done = True
+        return getattr(response, self._page_descriptor.resource_field)
