@@ -35,7 +35,8 @@ from __future__ import absolute_import
 import unittest2
 
 from google.gax import (
-    BundleOptions, CallOptions, CallSettings, OPTION_INHERIT, RetryOptions)
+    BundleOptions, CallOptions, CallSettings, INITIAL_PAGE, OPTION_INHERIT,
+    RetryOptions)
 
 
 class TestBundleOptions(unittest2.TestCase):
@@ -63,7 +64,7 @@ class TestCallSettings(unittest2.TestCase):
         options = CallOptions(timeout=23)
         self.assertEqual(options.timeout, 23)
         self.assertEqual(options.retry, OPTION_INHERIT)
-        self.assertEqual(options.is_page_streaming, OPTION_INHERIT)
+        self.assertEqual(options.page_token, OPTION_INHERIT)
 
     def test_settings_merge_options1(self):
         retry = RetryOptions(None, None)
@@ -85,11 +86,15 @@ class TestCallSettings(unittest2.TestCase):
 
     def test_settings_merge_options_page_streaming(self):
         retry = RetryOptions(None, None)
-        options = CallOptions(timeout=46, is_page_streaming=False)
-        settings = CallSettings(timeout=9, retry=retry)
+        page_descriptor = object()
+        options = CallOptions(timeout=46, page_token=INITIAL_PAGE)
+        settings = CallSettings(timeout=9, retry=retry,
+                                page_descriptor=page_descriptor)
         final = settings.merge(options)
         self.assertEqual(final.timeout, 46)
-        self.assertIsNone(final.page_descriptor)
+        self.assertEqual(final.page_descriptor, page_descriptor)
+        self.assertEqual(final.page_token, INITIAL_PAGE)
+        self.assertFalse(final.flatten_pages)
         self.assertEqual(final.retry, retry)
 
     def test_settings_merge_none(self):

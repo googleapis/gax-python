@@ -36,7 +36,7 @@ import unittest2
 
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
-    CallSettings, PageDescriptor, RetryOptions)
+    CallSettings, INITIAL_PAGE, PageDescriptor, RetryOptions)
 from google.gax.errors import GaxError, RetryError
 
 
@@ -267,12 +267,13 @@ class TestCreateApiCallable(unittest2.TestCase):
         # integers, returning `page_size` integers with each call and using
         # the next integer to return as the page token, until `pages_to_stream`
         # pages have been returned.
+        # pylint:disable=too-many-locals
         page_size = 3
         pages_to_stream = 5
 
         # pylint: disable=abstract-method, too-few-public-methods
         class PageStreamingRequest(object):
-            def __init__(self, page_token=0):
+            def __init__(self, page_token=INITIAL_PAGE):
                 self.page_token = page_token
 
         class PageStreamingResponse(object):
@@ -284,13 +285,13 @@ class TestCreateApiCallable(unittest2.TestCase):
             'page_token', 'next_page_token', 'nums')
 
         def grpc_return_value(request, *dummy_args, **dummy_kwargs):
-            if (request.page_token > 0 and
-                    request.page_token < page_size * pages_to_stream):
+            start = int(request.page_token) if request.page_token else 0
+            if start > 0 and start < page_size * pages_to_stream:
                 return PageStreamingResponse(
-                    nums=list(range(request.page_token,
-                                    request.page_token + page_size)),
-                    next_page_token=request.page_token + page_size)
-            elif request.page_token >= page_size * pages_to_stream:
+                    nums=list(range(start,
+                                    start + page_size)),
+                    next_page_token=start + page_size)
+            elif start >= page_size * pages_to_stream:
                 return PageStreamingResponse()
             else:
                 return PageStreamingResponse(nums=list(range(page_size)),
@@ -317,6 +318,22 @@ class TestCreateApiCallable(unittest2.TestCase):
                         for n in range(pages_to_stream)] + [()]
             self.assertEqual(list(unflattened_callable(PageStreamingRequest())),
                              expected)
+
+            pages_already_read = 2
+            explicit_page_token_settings = CallSettings(
+                page_descriptor=fake_grpc_func_descriptor, timeout=0,
+                flatten_pages=False,
+                page_token=str(page_size * pages_already_read))
+            explicit_page_token_callable = api_callable.create_api_call(
+                mock_grpc, settings=explicit_page_token_settings)
+            # Expect a list of pages_to_stream pages, each of size page_size,
+            # plus one empty page, minus the pages_already_read
+            expected = [list(range(page_size * n, page_size * (n + 1)))
+                        for n in range(pages_already_read, pages_to_stream)]
+            expected += [()]
+            self.assertEqual(
+                list(explicit_page_token_callable(PageStreamingRequest())),
+                expected)
 
     def test_bundling_page_streaming_error(self):
         settings = CallSettings(
