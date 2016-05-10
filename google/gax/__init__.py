@@ -153,8 +153,9 @@ class CallOptions(object):
            >>> # change an api call's timeout
            >>> o1 = CallOptions(timeout=30)  # make the timeout 30 seconds
            >>>
-           >>> # disable page streaming on an api call that normally supports it
-           >>> o2 = CallOptions(page_streaming=False)
+           >>> # set page streaming to be per-page on a call where it is
+           >>> # normally per-resource
+           >>> o2 = CallOptions(page_token=INITIAL_PAGE)
            >>>
            >>> # disable retrying on an api call that normally retries
            >>> o3 = CallOptions(retry=None)
