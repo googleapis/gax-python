@@ -176,7 +176,7 @@ class _Parser(object):
     t_EQUALS = r'='
     t_WILDCARD = r'\*'
     t_PATH_WILDCARD = r'\*\*'
-    t_LITERAL = r'[^*=}{}\/]+'
+    t_LITERAL = r'[^*=}{\/]+'
 
     t_ignore = ' \t'
 
