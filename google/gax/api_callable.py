@@ -35,7 +35,7 @@ import sys
 import time
 
 from . import (BackoffSettings, BundleOptions, bundling, CallSettings, config,
-               OPTION_INHERIT, PageIterator, RetryOptions)
+               PageIterator, RetryOptions)
 from .errors import GaxError, RetryError
 
 _MILLIS_PER_SECOND = 1000
@@ -203,17 +203,13 @@ def _page_streamable(a_func, page_descriptor, page_token=None,
     return flattened if flatten_pages else unflattened
 
 
-def _construct_bundling(method_config, method_bundling_override,
-                        bundle_descriptor):
+def _construct_bundling(bundle_config, bundle_descriptor):
     """Helper for ``construct_settings()``.
 
     Args:
-      method_config: A dictionary representing a single ``methods`` entry of the
-        standard API client config file. (See ``construct_settings()`` for
-        information on this yaml.)
-      method_retry_override: A BundleOptions object, OPTION_INHERIT, or None.
-        If set to OPTION_INHERIT, the retry settings are derived from method
-        config. Otherwise, this parameter overrides ``method_config``.
+      bundle_config: A dictionary specifying a bundle parameters, the value for
+        'bundling' field in a method config (See ``construct_settings()`` for
+        information on this config.)
       bundle_descriptor: A BundleDescriptor object describing the structure of
         bundling for this method. If not set, this method will not bundle.
 
@@ -221,41 +217,29 @@ def _construct_bundling(method_config, method_bundling_override,
       A tuple (bundling.Executor, BundleDescriptor) that configures bundling.
       The bundling.Executor may be None if this method should not bundle.
     """
-    if 'bundling' in method_config and bundle_descriptor:
-
-        if method_bundling_override == OPTION_INHERIT:
-            params = method_config['bundling']
-            bundler = bundling.Executor(BundleOptions(
-                element_count_threshold=params.get(
-                    'element_count_threshold', 0),
-                element_count_limit=params.get('element_count_limit', 0),
-                request_byte_threshold=params.get('request_byte_threshold', 0),
-                request_byte_limit=params.get('request_byte_limit', 0),
-                delay_threshold=params.get('delay_threshold_millis', 0)))
-        elif method_bundling_override:
-            bundler = bundling.Executor(method_bundling_override)
-        else:
-            bundler = None
-
+    if bundle_config and bundle_descriptor:
+        bundler = bundling.Executor(BundleOptions(
+            element_count_threshold=bundle_config.get(
+                'element_count_threshold', 0),
+            element_count_limit=bundle_config.get('element_count_limit', 0),
+            request_byte_threshold=bundle_config.get(
+                'request_byte_threshold', 0),
+            request_byte_limit=bundle_config.get('request_byte_limit', 0),
+            delay_threshold=bundle_config.get('delay_threshold_millis', 0)))
     else:
         bundler = None
 
     return bundler
 
 
-def _construct_retry(
-        method_config, method_retry_override, retry_codes, retry_params,
-        retry_names):
+def _construct_retry(method_config, retry_codes, retry_params, retry_names):
     """Helper for ``construct_settings()``.
 
     Args:
       method_config: A dictionary representing a single ``methods`` entry of the
         standard API client config file. (See ``construct_settings()`` for
         information on this yaml.)
-      method_retry_override: A RetryOptions object, OPTION_INHERIT, or None.
-        If set to OPTION_INHERIT, the retry settings are derived from method
-        config. Otherwise, this parameter overrides ``method_config``.
-      retry_codes_def: A dictionary parsed from the ``retry_codes_def`` entry
+      retry_codes: A dictionary parsed from the ``retry_codes`` entry
         of the standard API client config file. (See ``construct_settings()``
         for information on this yaml.)
       retry_params: A dictionary parsed from the ``retry_params`` entry
@@ -267,30 +251,54 @@ def _construct_retry(
     Returns:
       A RetryOptions object, or None.
     """
-    if method_retry_override != OPTION_INHERIT:
-        return method_retry_override
+    if method_config is None:
+        return None
 
-    codes = []
-    if retry_codes:
-        for codes_name in retry_codes:
-            if (codes_name == method_config['retry_codes_name'] and
-                    retry_codes[codes_name]):
-                codes = [
-                    retry_names[name] for name in retry_codes[codes_name]]
-                break
+    codes = None
+    if retry_codes and 'retry_codes_name' in method_config:
+        codes_name = method_config['retry_codes_name']
+        if codes_name in retry_codes and retry_codes[codes_name]:
+            codes = [retry_names[name] for name in retry_codes[codes_name]]
+        else:
+            codes = []
 
-    params_struct = None
-    if method_config.get('retry_params_name'):
-        for params_name in retry_params:
-            if params_name == method_config['retry_params_name']:
-                params_struct = retry_params[params_name].copy()
-                break
-        backoff_settings = BackoffSettings(**params_struct)
-    else:
-        backoff_settings = None
+    backoff_settings = None
+    if retry_params and 'retry_params_name' in method_config:
+        params_name = method_config['retry_params_name']
+        if params_name and params_name in retry_params:
+            backoff_settings = BackoffSettings(**retry_params[params_name])
 
-    retry = RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
-    return retry
+    return RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
+
+
+def _merge_retry_options(retry, overrides):
+    """Helper for ``construct_settings()``.
+
+    Takes two retry options, and merges them into a single RetryOption instance.
+
+    Args:
+      retry: The base RetryOptions.
+      overrides: The RetryOptions used for overriding ``retry``. Use the values
+        if it is not None. If entire ``overrides`` is None, ignore the base
+        retry and return None.
+
+    Returns:
+      The merged RetryOptions, or None if it will be canceled.
+    """
+    if overrides is None:
+        return None
+
+    if overrides.retry_codes is None and overrides.backoff_settings is None:
+        return retry
+
+    codes = retry.retry_codes
+    if overrides.retry_codes is not None:
+        codes = overrides.retry_codes
+    backoff_settings = retry.backoff_settings
+    if overrides.backoff_settings is not None:
+        backoff_settings = overrides.backoff_settings
+
+    return RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
 
 
 def _upper_camel_to_lower_under(string):
@@ -307,7 +315,7 @@ def _upper_camel_to_lower_under(string):
 
 
 def construct_settings(
-        service_name, client_config, bundling_override, retry_override,
+        service_name, client_config, config_override,
         retry_names, timeout, bundle_descriptors=None, page_descriptors=None):
     """Constructs a dictionary mapping method names to CallSettings.
 
@@ -357,18 +365,17 @@ def construct_settings(
 
     Args:
       service_name: The fully-qualified name of this service, used as a key into
-       the client config file (in the example above, this value should be
-       ``google.fake.v1.ServiceName``).
+        the client config file (in the example above, this value should be
+        ``google.fake.v1.ServiceName``).
       client_config: A dictionary parsed from the standard API client config
-       file.
+        file.
       bundle_descriptors: A dictionary of method names to BundleDescriptor
-       objects for methods that are bundling-enabled.
+        objects for methods that are bundling-enabled.
       page_descriptors: A dictionary of method names to PageDescriptor objects
-       for methods that are page streaming-enabled.
-      bundling_override: A dictionary of method names to BundleOptions
-        override those specified in ``client_config``.
-      retry_override: A dictionary of method names to RetryOptions that
-        override those specified in ``client_config``.
+        for methods that are page streaming-enabled.
+      config_override: A dictionary in the same structure of client_config to
+        override the settings. Usually client_config is supplied from the
+        default config and config_override will be specified by users.
       retry_names: A dictionary mapping the strings referring to response status
         codes to the Python objects representing those codes.
       timeout: The timeout parameter for all API calls in this dictionary.
@@ -378,7 +385,7 @@ def construct_settings(
         located in the provided ``client_config``.
     """
     # pylint: disable=too-many-locals
-    defaults = dict()
+    defaults = {}
     bundle_descriptors = bundle_descriptors or {}
     page_descriptors = page_descriptors or {}
 
@@ -388,25 +395,29 @@ def construct_settings(
         raise KeyError('Client configuration not found for service: {}'
                        .format(service_name))
 
+    overrides = config_override.get('interfaces', {}).get(service_name, {})
+
     for method in service_config.get('methods'):
         method_config = service_config['methods'][method]
+        overriding_method = overrides.get('methods', {}).get(method, {})
         snake_name = _upper_camel_to_lower_under(method)
 
         bundle_descriptor = bundle_descriptors.get(snake_name)
-        bundler = _construct_bundling(
-            method_config, bundling_override.get(snake_name, OPTION_INHERIT),
-            bundle_descriptor)
+        bundling_config = method_config.get('bundling', None)
+        if overriding_method and 'bundling' in overriding_method:
+            bundling_config = overriding_method['bundling']
+        bundler = _construct_bundling(bundling_config, bundle_descriptor)
 
-        retry = _construct_retry(
-            method_config, retry_override.get(snake_name, OPTION_INHERIT),
-            service_config['retry_codes'], service_config['retry_params'],
-            retry_names)
+        retry = _merge_retry_options(
+            _construct_retry(method_config, service_config['retry_codes'],
+                             service_config['retry_params'], retry_names),
+            _construct_retry(overriding_method, overrides.get('retry_codes'),
+                             overrides.get('retry_params'), retry_names))
 
         defaults[snake_name] = CallSettings(
             timeout=timeout, retry=retry,
             page_descriptor=page_descriptors.get(snake_name),
             bundler=bundler, bundle_descriptor=bundle_descriptor)
-
     return defaults
 
 

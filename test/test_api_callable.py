@@ -71,7 +71,7 @@ _A_CONFIG = {
                         'element_count_limit': 10
                     }
                 },
-                'page_streaming_method': {
+                'PageStreamingMethod': {
                     'retry_codes_name': 'bar_retry',
                     'retry_params_name': 'default'
                 }
@@ -366,7 +366,7 @@ class TestCreateApiCallable(unittest2.TestCase):
 
     def test_construct_settings(self):
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, dict(), dict(), _RETRY_DICT, 30,
+            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT, 30,
             bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
@@ -383,11 +383,21 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertIsInstance(settings.retry, RetryOptions)
 
     def test_construct_settings_override(self):
-        _bundling_override = {'bundling_method': None}
-        _retry_override = {'page_streaming_method': None}
+        _override = {
+            'interfaces': {
+                _SERVICE_NAME: {
+                    'methods': {
+                        'PageStreamingMethod': None,
+                        'BundlingMethod': {
+                            'bundling': None
+                        }
+                    }
+                }
+            }
+        }
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, _bundling_override, _retry_override,
-            _RETRY_DICT, 30, bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT, 30,
+            bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
         self.assertEquals(settings.timeout, 30)
@@ -397,6 +407,55 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertEquals(settings.timeout, 30)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
         self.assertIsNone(settings.retry)
+
+    def test_construct_settings_override2(self):
+        _override = {
+            'interfaces': {
+                _SERVICE_NAME: {
+                    'retry_codes': {
+                        'bar_retry': [],
+                        'baz_retry': ['code_a']
+                    },
+                    'retry_params': {
+                        'default': {
+                            'initial_retry_delay_millis': 1000,
+                            'retry_delay_multiplier': 1.2,
+                            'max_retry_delay_millis': 10000,
+                            'initial_rpc_timeout_millis': 3000,
+                            'rpc_timeout_multiplier': 1.3,
+                            'max_rpc_timeout_millis': 30000,
+                            'total_timeout_millis': 300000
+                        },
+                    },
+                    'methods': {
+                        'BundlingMethod': {
+                            'retry_params_name': 'default',
+                            'retry_codes_name': 'baz_retry',
+                        },
+                    },
+                }
+            }
+        }
+        defaults = api_callable.construct_settings(
+            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT, 30,
+            bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            page_descriptors=_PAGE_DESCRIPTORS)
+        settings = defaults['bundling_method']
+        backoff = settings.retry.backoff_settings
+        self.assertEquals(backoff.initial_retry_delay_millis, 1000)
+        self.assertEquals(settings.retry.retry_codes, [_RETRY_DICT['code_a']])
+        self.assertIsInstance(settings.bundler, bundling.Executor)
+        self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
+
+        # page_streaming_method is unaffected because it's not specified in
+        # overrides. 'bar_retry' or 'default' definitions in overrides should
+        # not affect the methods which are not in the overrides.
+        settings = defaults['page_streaming_method']
+        backoff = settings.retry.backoff_settings
+        self.assertEquals(backoff.initial_retry_delay_millis, 100)
+        self.assertEquals(backoff.retry_delay_multiplier, 1.2)
+        self.assertEquals(backoff.max_retry_delay_millis, 1000)
+        self.assertEquals(settings.retry.retry_codes, [_RETRY_DICT['code_c']])
 
     @mock.patch('google.gax.config.API_ERRORS', (CustomException, ))
     def test_catch_error(self):
