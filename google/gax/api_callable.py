@@ -35,13 +35,13 @@ import sys
 import time
 
 from . import (BackoffSettings, BundleOptions, bundling, CallSettings, config,
-               PageIterator, RetryOptions)
+               PageIterator, ResourceIterator, RetryOptions)
 from .errors import GaxError, RetryError
 
 _MILLIS_PER_SECOND = 1000
 
 
-def _add_timeout_arg(a_func, timeout):
+def _add_timeout_arg(a_func, timeout, **kwargs):
     """Updates a_func so that it gets called with the timeout as its final arg.
 
     This converts a callable, a_func, into another callable with an additional
@@ -57,26 +57,26 @@ def _add_timeout_arg(a_func, timeout):
       callable: the original callable updated to the timeout arg
     """
 
-    def inner(*args, **kw):
+    def inner(*args):
         """Updates args with the timeout."""
         updated_args = args + (timeout,)
-        return a_func(*updated_args, **kw)
+        return a_func(*updated_args, **kwargs)
 
     return inner
 
 
-def _retryable(a_func, retry):
+def _retryable(a_func, retry, **kwargs):
     """Creates a function equivalent to a_func, but that retries on certain
     exceptions.
 
     Args:
-        a_func (callable): A callable.
-        retry (RetryOptions): Configures the exceptions upon which the callable
-          should retry, and the parameters to the exponential backoff retry
-          algorithm.
+      a_func (callable): A callable.
+      retry (RetryOptions): Configures the exceptions upon which the callable
+        should retry, and the parameters to the exponential backoff retry
+        algorithm.
 
     Returns:
-        A function that will retry on exception.
+      A function that will retry on exception.
     """
 
     delay_mult = retry.backoff_settings.retry_delay_multiplier
@@ -88,7 +88,7 @@ def _retryable(a_func, retry):
     total_timeout = (retry.backoff_settings.total_timeout_millis /
                      _MILLIS_PER_SECOND)
 
-    def inner(*args, **kwargs):
+    def inner(*args):
         """Equivalent to ``a_func``, but retries upon transient failure.
 
         Retrying is done through an exponential backoff algorithm configured
@@ -104,8 +104,8 @@ def _retryable(a_func, retry):
 
         while now < deadline:
             try:
-                to_call = _add_timeout_arg(a_func, timeout)
-                return to_call(*args, **kwargs)
+                to_call = _add_timeout_arg(a_func, timeout, **kwargs)
+                return to_call(*args)
 
             # pylint: disable=broad-except
             except Exception as exception:
@@ -130,7 +130,7 @@ def _retryable(a_func, retry):
     return inner
 
 
-def _bundleable(a_func, desc, bundler):
+def _bundleable(desc):
     """Creates a function that transforms an API call into a bundling call.
 
     It transform a_func from an API call that receives the requests and returns
@@ -141,66 +141,48 @@ def _bundleable(a_func, desc, bundler):
     bundled call.
 
     Args:
-        a_func (callable[[req], resp]): an API call that supports bundling.
-        desc (gax.BundleDescriptor): describes the bundling that a_func
-          supports.
-        bundler (gax.bundling.Executor): orchestrates bundling.
+      base_caller (callable): the basic API caller for the fallback when
+        bundling is actually disabled for the call.
+      desc (gax.BundleDescriptor): describes the bundling that a_func
+        supports.
 
     Returns:
-        callable: takes the API call's request and keyword args and returns a
-          bundling.Event object.
+      callable: takes the API call's request and keyword args and returns a
+        bundling.Event object.
 
     """
-    def inner(*args, **kwargs):
+    def inner(a_func, settings, request, **kwargs):
         """Schedules execution of a bundling task."""
-        request = args[0]
+        if not settings.bundler:
+            return a_func(request, **kwargs)
+
         the_id = bundling.compute_bundle_id(
             request, desc.request_discriminator_fields)
-        return bundler.schedule(a_func, the_id, desc, request, kwargs)
+        return settings.bundler.schedule(a_func, the_id, desc, request, kwargs)
 
     return inner
 
 
-def _page_streamable(a_func, page_descriptor, page_token=None,
-                     flatten_pages=True):
+def _page_streamable(page_descriptor):
     """Creates a function that yields an iterable to performs page-streaming.
 
     Args:
-        a_func (callable[[req], resp]): an API call that is page streaming.
         page_descriptor (:class:`PageDescriptor`): indicates the structure
           of page streaming to be performed.
-        page_token (str): Optional. If set and page streaming is over pages of
-          the response, indicates the page_token to be passed to the API call.
-        flatten_pages (bool): Optional. If set, the returned iterable is over
-          ``resource_field``; otherwise the returned iterable is over the pages
-          of the response, each of which is an iterable over ``resource_field``.
-
     Returns:
-        A function that returns an iterable.
+        A function that returns an iterator.
     """
 
-    def flattened(*args, **kwargs):
-        """A generator that yields all the paged responses."""
-        request = args[0]
-        while True:
-            response = a_func(request, **kwargs)
-            for obj in getattr(response, page_descriptor.resource_field):
-                yield obj
-            next_page_token = getattr(
-                response, page_descriptor.response_page_token_field)
-            if not next_page_token:
-                break
-            setattr(request,
-                    page_descriptor.request_page_token_field,
-                    next_page_token)
+    def inner(a_func, settings, request, **kwargs):
+        """Actual page-streaming based on the settings."""
+        page_iterator = PageIterator(
+            a_func, page_descriptor, settings.page_token, request, **kwargs)
+        if settings.flatten_pages:
+            return ResourceIterator(page_iterator)
+        else:
+            return page_iterator
 
-    def unflattened(*args, **kwargs):
-        """A generator that yields individual pages."""
-        request = args[0]
-        return PageIterator(
-            a_func, page_descriptor, page_token, request, **kwargs)
-
-    return flattened if flatten_pages else unflattened
+    return inner
 
 
 def _construct_bundling(bundle_config, bundle_descriptor):
@@ -316,7 +298,8 @@ def _upper_camel_to_lower_under(string):
 
 def construct_settings(
         service_name, client_config, config_override,
-        retry_names, timeout, bundle_descriptors=None, page_descriptors=None):
+        retry_names, timeout, bundle_descriptors=None, page_descriptors=None,
+        kwargs=None):
     """Constructs a dictionary mapping method names to CallSettings.
 
     The ``client_config`` parameter is parsed from a client configuration JSON
@@ -379,6 +362,7 @@ def construct_settings(
       retry_names: A dictionary mapping the strings referring to response status
         codes to the Python objects representing those codes.
       timeout: The timeout parameter for all API calls in this dictionary.
+      kwargs: The keyword arguments to be passed to the API calls.
 
     Raises:
       KeyError: If the configuration for the service in question cannot be
@@ -388,6 +372,7 @@ def construct_settings(
     defaults = {}
     bundle_descriptors = bundle_descriptors or {}
     page_descriptors = page_descriptors or {}
+    kwargs = kwargs or {}
 
     try:
         service_config = client_config['interfaces'][service_name]
@@ -417,7 +402,8 @@ def construct_settings(
         defaults[snake_name] = CallSettings(
             timeout=timeout, retry=retry,
             page_descriptor=page_descriptors.get(snake_name),
-            bundler=bundler, bundle_descriptor=bundle_descriptor)
+            bundler=bundler, bundle_descriptor=bundle_descriptor,
+            kwargs=kwargs)
     return defaults
 
 
@@ -471,27 +457,30 @@ def create_api_call(func, settings):
          and page_streaming are both configured
 
     """
-    if settings.retry and settings.retry.retry_codes:
-        api_call = _retryable(func, settings.retry)
-    else:
-        api_call = _add_timeout_arg(func, settings.timeout)
+    def base_caller(api_call, _, *args):
+        """Simply call api_call and ignore settings."""
+        return api_call(*args)
+
+    def inner(request, options=None):
+        """Invoke with the actual settings."""
+        this_settings = settings.merge(options)
+        if this_settings.retry and this_settings.retry.retry_codes:
+            api_call = _retryable(
+                func, this_settings.retry, **this_settings.kwargs)
+        else:
+            api_call = _add_timeout_arg(
+                func, this_settings.timeout, **this_settings.kwargs)
+        api_call = _catch_errors(api_call, config.API_ERRORS)
+        return api_caller(api_call, this_settings, request)
 
     if settings.page_descriptor:
         if settings.bundler and settings.bundle_descriptor:
             raise ValueError('The API call has incompatible settings: '
                              'bundling and page streaming')
-        if settings.flatten_pages is None:
-            flatten_pages = True
-        else:
-            flatten_pages = settings.flatten_pages
-        return _page_streamable(
-            api_call,
-            settings.page_descriptor,
-            page_token=settings.page_token,
-            flatten_pages=flatten_pages)
+        api_caller = _page_streamable(settings.page_descriptor)
+    elif settings.bundler and settings.bundle_descriptor:
+        api_caller = _bundleable(settings.bundle_descriptor)
+    else:
+        api_caller = base_caller
 
-    if settings.bundler and settings.bundle_descriptor:
-        return _bundleable(api_call, settings.bundle_descriptor,
-                           settings.bundler)
-
-    return _catch_errors(api_call, config.API_ERRORS)
+    return inner

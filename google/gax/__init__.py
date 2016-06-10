@@ -52,8 +52,8 @@ class CallSettings(object):
     """Encapsulates the call settings for an API call."""
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=30, retry=None, page_descriptor=None,
-                 flatten_pages=None, page_token=None, bundler=None,
-                 bundle_descriptor=None):
+                 page_token=None, bundler=None, bundle_descriptor=None,
+                 kwargs=None):
         """Constructor.
 
         Args:
@@ -64,11 +64,6 @@ class CallSettings(object):
             page_descriptor (:class:`PageDescriptor`): indicates the structure
               of page streaming to be performed. If set to None, page streaming
               is disabled.
-            flatten_pages (bool): If there is no ``page_descriptor``, this
-              attrbute has no meaning. Otherwise, determines whether a page
-              streamed response should make the page structure transparent to
-              the user by flattening the repeated field in the returned
-              generator.
             page_token (str): If there is no ``page_descriptor``, this attribute
               has no meaning. Otherwise, determines the page token used in the
               page streaming request.
@@ -76,14 +71,27 @@ class CallSettings(object):
               None, bundling is not performed.
             bundle_descriptor (:class:`BundleDescriptor`): indicates the
               structure of of the bundle. If None, bundling is disabled.
+            kwargs (dict): other keyword arguments to be passed to the API
+              calls.
         """
         self.timeout = timeout
         self.retry = retry
         self.page_descriptor = page_descriptor
-        self.flatten_pages = flatten_pages
         self.page_token = page_token
         self.bundler = bundler
         self.bundle_descriptor = bundle_descriptor
+        self.kwargs = kwargs or {}
+
+    @property
+    def flatten_pages(self):
+        """
+        A boolean property indicating whether a page streamed response should
+        make the page structure transparent to the user by flattening the
+        repeated field in the returned iterator.
+
+        There is no ``page_descriptor``, this means nothing.
+        """
+        return self.page_token is None
 
     def merge(self, options):
         """Returns a new CallSettings merged from this and a CallOptions object.
@@ -103,8 +111,10 @@ class CallSettings(object):
         if not options:
             return CallSettings(
                 timeout=self.timeout, retry=self.retry,
-                page_descriptor=self.page_descriptor, bundler=self.bundler,
-                bundle_descriptor=self.bundle_descriptor)
+                page_descriptor=self.page_descriptor,
+                page_token=self.page_token,
+                bundler=self.bundler, bundle_descriptor=self.bundle_descriptor,
+                kwargs=self.kwargs)
         else:
             if options.timeout == OPTION_INHERIT:
                 timeout = self.timeout
@@ -117,10 +127,8 @@ class CallSettings(object):
                 retry = options.retry
 
             if options.page_token == OPTION_INHERIT:
-                flatten_pages = self.flatten_pages
                 page_token = self.page_token
             else:
-                flatten_pages = False
                 page_token = options.page_token
 
             if options.is_bundling:
@@ -128,11 +136,17 @@ class CallSettings(object):
             else:
                 bundler = None
 
+            if options.kwargs == OPTION_INHERIT:
+                kwargs = self.kwargs
+            else:
+                kwargs = self.kwargs.copy()
+                kwargs.update(options.kwargs)
+
             return CallSettings(
                 timeout=timeout, retry=retry,
                 page_descriptor=self.page_descriptor, page_token=page_token,
-                flatten_pages=flatten_pages, bundler=bundler,
-                bundle_descriptor=self.bundle_descriptor)
+                bundler=bundler, bundle_descriptor=self.bundle_descriptor,
+                kwargs=kwargs)
 
 
 class CallOptions(object):
@@ -146,7 +160,7 @@ class CallOptions(object):
     """
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
-                 page_token=OPTION_INHERIT, is_bundling=False):
+                 page_token=OPTION_INHERIT, is_bundling=False, **kwargs):
         """Constructor.
 
         Example:
@@ -182,6 +196,7 @@ class CallOptions(object):
         self.retry = retry
         self.page_token = page_token
         self.is_bundling = is_bundling
+        self.kwargs = kwargs or OPTION_INHERIT
 
 
 class PageDescriptor(
@@ -429,3 +444,33 @@ class PageIterator(object):
         if not self.page_token:
             self._done = True
         return getattr(response, self._page_descriptor.resource_field)
+
+
+class ResourceIterator(object):
+    """An iterator over resources of the page iterator."""
+
+    # pylint: disable=too-few-public-methods
+    def __init__(self, page_iterator):
+        """Constructor.
+
+        Args:
+          page_iterator (PageIterator): the base iterator of getting pages.
+        """
+        self._iterator = page_iterator
+        self._current = None
+        self._index = -1
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        """Retrieves the next resource."""
+        # pylint: disable=next-method-called
+        while not self._current:
+            self._current = self._iterator.next()
+            self._index = 0
+        resource = self._current[self._index]
+        self._index += 1
+        if self._index >= len(self._current):
+            self._current = None
+        return resource
