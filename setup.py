@@ -49,7 +49,7 @@ with open('google/gax/__init__.py', 'r') as f:
         raise RuntimeError("No version number found!")
 
 install_requires = [
-    'grpcio==0.13.1',
+    'grpcio>=0.14.0',
     'ply==3.8',
     'protobuf>=3.0.0b1.post1',
     'oauth2client>=1.5.2',
@@ -68,7 +68,7 @@ setup(
     package_dir={'google-gax': 'google'},
     license='BSD-3-Clause',
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python',
