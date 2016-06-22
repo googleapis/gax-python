@@ -65,5 +65,8 @@ coverage.xml
 docs/_build/
 _build
 
+#Protobuf
+*_pb2.py
+
 # PyBuilder
 target/

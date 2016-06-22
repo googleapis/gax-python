@@ -67,11 +67,9 @@ def _str_dotted_getattr(obj, name):
     Raises:
        AttributeError if the named attribute does not exist.
     """
-    if name.find('.') == -1:
-        return getattr(obj, name)
     for part in name.split('.'):
         obj = getattr(obj, part)
-    return str(obj) if obj is not None else None
+    return str(obj) if obj else None
 
 
 def compute_bundle_id(obj, discriminator_fields):
@@ -190,7 +188,9 @@ class Task(object):
                 for i, event in zip(in_sizes, self._event_deque):
                     next_copy = copy.copy(resp)
                     subresponses = all_subresponses[start:start + i]
-                    setattr(next_copy, subresponse_field, subresponses)
+                    # TODO: assumes we are using GRPC; abstract into config.py for portability
+                    next_copy.ClearField(subresponse_field)
+                    getattr(next_copy, subresponse_field).extend(subresponses)
                     start += i
                     event.result = next_copy
                     event.set()

@@ -37,25 +37,22 @@ import unittest2
 
 from google.gax import bundling, BundleOptions, BundleDescriptor
 
-
-# pylint: disable=too-few-public-methods
-class _Simple(object):
-    def __init__(self, value, other_value=None):
-        self.field1 = value
-        self.field2 = other_value
-
-    def __eq__(self, other):
-        return (self.field1 == other.field1 and
-                self.field2 == other.field2)
-
-    def __str__(self):
-        return 'field1={0}, field2={1}'.format(self.field1, self.field2)
+from fixture_pb2 import Simple, Outer, Bundled
 
 
-class _Outer(object):
-    def __init__(self, value):
-        self.inner = _Simple(value, other_value=value)
-        self.field1 = value
+def _Simple(value, other_value=None):
+    if other_value is None:
+        return Simple(field1=value)
+    else:
+        return Simple(field1=value, field2=other_value)
+
+
+def _Outer(value):
+    return Outer(inner=_Simple(value, value), field1=value)
+
+
+def _Bundled(value):
+    return Bundled(field1=value)
 
 
 class TestComputeBundleId(unittest2.TestCase):
@@ -135,7 +132,7 @@ def _make_a_test_task(api_call=_return_request):
         api_call,
         'an_id',
         'field1',
-        _Simple([]),
+        _Bundled([]),
         dict())
 
 
@@ -212,13 +209,13 @@ class TestTask(unittest2.TestCase):
                 'message': 'a single bundled message',
                 'has_event': True,
                 'count_before_run': 1,
-                'want': _Simple([simple_msg])
+                'want': _Bundled([simple_msg])
             }, {
                 'update': (lambda t: _extend_with_n_elts(t, simple_msg, 5)),
                 'message': '5 bundle messages',
                 'has_event': True,
                 'count_before_run': 5,
-                'want': _Simple([simple_msg] * 5)
+                'want': _Bundled([simple_msg] * 5)
             }
         ]
         for t in tests:
@@ -259,7 +256,7 @@ class TestTask(unittest2.TestCase):
         self.assertEquals(test_task.element_count, 1)
         test_task.run()
         self.assertEquals(test_task.element_count, 0)
-        self.assertEquals(_Simple([another_msg]), another_event.result)
+        self.assertEquals(_Bundled([another_msg]), another_event.result)
         self.assertFalse(an_event.is_set())
         self.assertIsNone(an_event.result)
 
@@ -283,7 +280,7 @@ class TestExecutor(unittest2.TestCase):
                     api_call,
                     an_id,
                     SIMPLE_DESCRIPTOR,
-                    _Simple([an_elt])
+                    _Bundled([an_elt])
                 )
                 self.assertIsNotNone(
                     got_event.canceller,
@@ -297,14 +294,14 @@ class TestExecutor(unittest2.TestCase):
                 api_call,
                 an_id,
                 SIMPLE_DESCRIPTOR,
-                _Simple([an_elt])
+                _Bundled([an_elt])
             )
             self.assertIsNotNone(got_event.canceller,
                                  'missing expected canceller')
             self.assertTrue(
                 got_event.is_set(),
                 'event is not set after triggering element')
-            self.assertEquals(_Simple([an_elt] * threshold),
+            self.assertEquals(_Bundled([an_elt] * threshold),
                               got_event.result)
 
     def test_each_event_has_exception_when_demuxed_api_call_fails(self):
@@ -320,7 +317,7 @@ class TestExecutor(unittest2.TestCase):
                 api_call,
                 bundle_id,
                 DEMUX_DESCRIPTOR,
-                _Simple(['%s%d' % (an_elt, i)])
+                _Bundled(['%s%d' % (an_elt, i)])
             )
             self.assertFalse(
                 got_event.is_set(),
@@ -331,7 +328,7 @@ class TestExecutor(unittest2.TestCase):
             api_call,
             bundle_id,
             DEMUX_DESCRIPTOR,
-            _Simple(['%s%d' % (an_elt, threshold - 1)])
+            _Bundled(['%s%d' % (an_elt, threshold - 1)])
         )
         events.append(last_event)
 
@@ -359,7 +356,7 @@ class TestExecutor(unittest2.TestCase):
                 api_call,
                 bundle_id,
                 DEMUX_DESCRIPTOR,
-                _Simple(['%s%d' % (an_elt, i)] * i)
+                _Bundled(['%s%d' % (an_elt, i)] * i)
             )
             events.append(got_event)
         previous_event = None
@@ -370,12 +367,12 @@ class TestExecutor(unittest2.TestCase):
             self.assertTrue(event.is_set(),
                             'event is not set after triggering element')
             self.assertEquals(event.result,
-                              _Simple(['%s%d' % (an_elt, index)] * index))
+                              _Bundled(['%s%d' % (an_elt, index)] * index))
             previous_event = event
 
     def test_each_event_has_same_result_from_mismatched_demuxed_api_call(self):
         an_elt = 'dummy message'
-        mismatched_result = _Simple([an_elt, an_elt])
+        mismatched_result = _Bundled([an_elt, an_elt])
         bundle_id = 'an_id'
         threshold = 5  # arbitrary, greater than 1
         options = BundleOptions(element_count_threshold=threshold)
@@ -388,7 +385,7 @@ class TestExecutor(unittest2.TestCase):
                 lambda x: mismatched_result,
                 bundle_id,
                 DEMUX_DESCRIPTOR,
-                _Simple(['%s%d' % (an_elt, i)] * i)
+                _Bundled(['%s%d' % (an_elt, i)] * i)
             )
             events.append(got_event)
         previous_event = None
@@ -409,7 +406,7 @@ class TestExecutor(unittest2.TestCase):
             _return_kwargs,
             bundle_id,
             SIMPLE_DESCRIPTOR,
-            _Simple([an_elt]),
+            _Bundled([an_elt]),
             {'an_option': 'a_value'}
         )
         self.assertEquals('a_value',
@@ -430,7 +427,7 @@ class TestExecutor_ElementCountTrigger(unittest2.TestCase):
                 api_call,
                 an_id,
                 SIMPLE_DESCRIPTOR,
-                _Simple([an_elt])
+                _Bundled([an_elt])
             )
             self.assertIsNotNone(
                 got_event.canceller,
@@ -440,7 +437,7 @@ class TestExecutor_ElementCountTrigger(unittest2.TestCase):
                 self.assertIsNone(got_event.result)
             else:
                 self.assertTrue(got_event.is_set())
-                self.assertEquals(_Simple([an_elt] * threshold),
+                self.assertEquals(_Bundled([an_elt] * threshold),
                                   got_event.result)
 
 
@@ -459,7 +456,7 @@ class TestExecutor_RequestByteTrigger(unittest2.TestCase):
                 api_call,
                 an_id,
                 SIMPLE_DESCRIPTOR,
-                _Simple([an_elt])
+                _Bundled([an_elt])
             )
             self.assertIsNotNone(
                 got_event.canceller,
@@ -469,7 +466,7 @@ class TestExecutor_RequestByteTrigger(unittest2.TestCase):
                 self.assertIsNone(got_event.result)
             else:
                 self.assertTrue(got_event.is_set())
-                self.assertEquals(_Simple([an_elt] * elts_for_threshold),
+                self.assertEquals(_Bundled([an_elt] * elts_for_threshold),
                                   got_event.result)
 
 
@@ -487,7 +484,7 @@ class TestExecutor_DelayThreshold(unittest2.TestCase):
             api_call,
             an_id,
             SIMPLE_DESCRIPTOR,
-            _Simple([an_elt])
+            _Bundled([an_elt])
         )
         self.assertIsNotNone(got_event, 'missing event after first request')
         self.assertIsNone(got_event.result)
