@@ -127,6 +127,7 @@ class Task(object):
         self.bundle_id = bundle_id
         self.bundled_field = bundled_field
         self.subresponse_field = subresponse_field
+        self.timer = None
         self._in_deque = collections.deque()
         self._event_deque = collections.deque()
 
@@ -272,7 +273,6 @@ class Executor(object):
         self._options = options
         self._tasks = {}
         self._task_lock = threading.RLock()
-        self._timer = None
 
     def schedule(self, api_call, bundle_id, bundle_desc, bundling_request,
                  kwargs=None):
@@ -332,13 +332,13 @@ class Executor(object):
 
     def _run_later(self, bundle, delay_threshold):
         with self._task_lock:
-            if self._timer is None:
+            if bundle.timer is None:
                 the_timer = TIMER_FACTORY(
                     delay_threshold,
                     self._run_now,
                     args=[bundle.bundle_id])
                 the_timer.start()
-                self._timer = the_timer
+                bundle.timer = the_timer
 
     def _run_now(self, bundle_id):
         with self._task_lock:
