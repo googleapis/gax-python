@@ -1,4 +1,4 @@
-grpcio>=0.14.0
+grpcio>=0.15.0
 oauth2client>=1.5.2
 ply==3.8
-protobuf>=3.0.0b1.post1
+protobuf>=3.0.0b3
