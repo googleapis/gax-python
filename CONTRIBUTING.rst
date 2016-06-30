@@ -110,11 +110,13 @@ Running Tests
     `gax-python` checkout root directory (it contains :code:`tox.ini`),
     invoke the `tox` console script.  This will read the :code:`tox.ini` file and
     execute the tests on multiple Python versions and platforms; while it runs,
-    it creates a virtualenv for each version/platform combination.  For
-    example:
+    it creates a virtualenv for each version/platform combination.  Note that
+    your `BREW_HOME` must be set to the brew directory where protoc is installed
+    in order for tests to work. For example:
 
   .. code:: bash
 
+      export BREW_HOME=~/.linuxbrew
       sudo pip install tox
       cd ~/hack-on-gax-python
       tox
