@@ -66,6 +66,7 @@ _A_CONFIG = {
                 'BundlingMethod': {
                     'retry_codes_name': 'foo_retry',
                     'retry_params_name': 'default',
+                    'timeout_millis': 25000,
                     'bundling': {
                         'element_count_threshold': 6,
                         'element_count_limit': 10
@@ -73,7 +74,8 @@ _A_CONFIG = {
                 },
                 'PageStreamingMethod': {
                     'retry_codes_name': 'bar_retry',
-                    'retry_params_name': 'default'
+                    'retry_params_name': 'default',
+                    'timeout_millis': 12000
                 }
             }
         }
@@ -373,19 +375,19 @@ class TestCreateApiCallable(unittest2.TestCase):
 
     def test_construct_settings(self):
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT, 30,
+            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT,
             bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS,
             kwargs={'key1': 'value1'})
         settings = defaults['bundling_method']
-        self.assertEquals(settings.timeout, 30)
+        self.assertAlmostEqual(settings.timeout, 25.0)
         self.assertIsInstance(settings.bundler, bundling.Executor)
         self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
         self.assertIsNone(settings.page_descriptor)
         self.assertIsInstance(settings.retry, RetryOptions)
         self.assertEquals(settings.kwargs, {'key1': 'value1'})
         settings = defaults['page_streaming_method']
-        self.assertEquals(settings.timeout, 30)
+        self.assertAlmostEqual(settings.timeout, 12.0)
         self.assertIsNone(settings.bundler)
         self.assertIsNone(settings.bundle_descriptor)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
@@ -399,6 +401,7 @@ class TestCreateApiCallable(unittest2.TestCase):
                     'methods': {
                         'PageStreamingMethod': None,
                         'BundlingMethod': {
+                            'timeout_millis': 8000,
                             'bundling': None
                         }
                     }
@@ -406,15 +409,15 @@ class TestCreateApiCallable(unittest2.TestCase):
             }
         }
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT, 30,
+            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT,
             bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
-        self.assertEquals(settings.timeout, 30)
+        self.assertAlmostEqual(settings.timeout, 8.0)
         self.assertIsNone(settings.bundler)
         self.assertIsNone(settings.page_descriptor)
         settings = defaults['page_streaming_method']
-        self.assertEquals(settings.timeout, 30)
+        self.assertAlmostEqual(settings.timeout, 12.0)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
         self.assertIsNone(settings.retry)
 
@@ -447,7 +450,7 @@ class TestCreateApiCallable(unittest2.TestCase):
             }
         }
         defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT, 30,
+            _SERVICE_NAME, _A_CONFIG, _override, _RETRY_DICT,
             bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']

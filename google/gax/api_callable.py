@@ -298,7 +298,7 @@ def _upper_camel_to_lower_under(string):
 
 def construct_settings(
         service_name, client_config, config_override,
-        retry_names, timeout, bundle_descriptors=None, page_descriptors=None,
+        retry_names, bundle_descriptors=None, page_descriptors=None,
         kwargs=None):
     """Constructs a dictionary mapping method names to CallSettings.
 
@@ -328,7 +328,8 @@ def construct_settings(
              "methods": {
                "CreateFoo": {
                  "retry_codes_name": "idempotent",
-                 "retry_params_name": "default"
+                 "retry_params_name": "default",
+                 "timeout_millis": 30000
                },
                "Publish": {
                  "retry_codes_name": "non_idempotent",
@@ -361,7 +362,6 @@ def construct_settings(
         default config and config_override will be specified by users.
       retry_names: A dictionary mapping the strings referring to response status
         codes to the Python objects representing those codes.
-      timeout: The timeout parameter for all API calls in this dictionary.
       kwargs: The keyword arguments to be passed to the API calls.
 
     Raises:
@@ -386,6 +386,12 @@ def construct_settings(
         method_config = service_config['methods'][method]
         overriding_method = overrides.get('methods', {}).get(method, {})
         snake_name = _upper_camel_to_lower_under(method)
+
+        if overriding_method and overriding_method.get('timeout_millis'):
+            timeout = overriding_method['timeout_millis']
+        else:
+            timeout = method_config['timeout_millis']
+        timeout /= _MILLIS_PER_SECOND
 
         bundle_descriptor = bundle_descriptors.get(snake_name)
         bundling_config = method_config.get('bundling', None)
