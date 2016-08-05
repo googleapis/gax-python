@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.12.3'
+__version__ = '0.12.4'
 
 
 INITIAL_PAGE = object()
