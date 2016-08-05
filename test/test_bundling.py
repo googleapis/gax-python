@@ -89,7 +89,7 @@ class TestComputeBundleId(unittest2.TestCase):
         for t in tests:
             got = bundling.compute_bundle_id(t['object'], t['fields'])
             message = 'failed while making an id for {}'.format(t['message'])
-            self.assertEquals(got, t['want'], message)
+            self.assertEqual(got, t['want'], message)
 
     def test_should_raise_if_fields_are_missing(self):
         tests = [
@@ -169,7 +169,7 @@ class TestTask(unittest2.TestCase):
             t['update'](test_task)
             got = test_task.element_count
             message = 'bad message count when {}'.format(t['message'])
-            self.assertEquals(got, t['want'], message)
+            self.assertEqual(got, t['want'], message)
 
     def test_extend_increases_the_request_byte_count(self):
         simple_msg = 'a simple msg'
@@ -193,7 +193,7 @@ class TestTask(unittest2.TestCase):
             t['update'](test_task)
             got = test_task.request_bytesize
             message = 'bad message count when {}'.format(t['message'])
-            self.assertEquals(got, t['want'], message)
+            self.assertEqual(got, t['want'], message)
 
     def test_run_sends_the_bundle_elements(self):
         simple_msg = 'a simple msg'
@@ -221,26 +221,26 @@ class TestTask(unittest2.TestCase):
         for t in tests:
             test_task = _make_a_test_task()
             event = t['update'](test_task)
-            self.assertEquals(test_task.element_count, t['count_before_run'])
+            self.assertEqual(test_task.element_count, t['count_before_run'])
             test_task.run()
-            self.assertEquals(test_task.element_count, 0)
-            self.assertEquals(test_task.request_bytesize, 0)
+            self.assertEqual(test_task.element_count, 0)
+            self.assertEqual(test_task.request_bytesize, 0)
             if t['has_event']:
                 self.assertIsNotNone(
                     event,
                     'expected event for {}'.format(t['message']))
                 got = event.result
                 message = 'bad output when run with {}'.format(t['message'])
-                self.assertEquals(got, t['want'], message)
+                self.assertEqual(got, t['want'], message)
 
     def test_run_adds_an_error_if_execution_fails(self):
         simple_msg = 'a simple msg'
         test_task = _make_a_test_task(api_call=_raise_exc)
         event = test_task.extend([simple_msg])
-        self.assertEquals(test_task.element_count, 1)
+        self.assertEqual(test_task.element_count, 1)
         test_task.run()
-        self.assertEquals(test_task.element_count, 0)
-        self.assertEquals(test_task.request_bytesize, 0)
+        self.assertEqual(test_task.element_count, 0)
+        self.assertEqual(test_task.request_bytesize, 0)
         self.assertTrue(isinstance(event.result, ValueError))
 
     def test_calling_the_canceller_stops_the_element_from_getting_sent(self):
@@ -249,14 +249,14 @@ class TestTask(unittest2.TestCase):
         test_task = _make_a_test_task()
         an_event = test_task.extend([an_elt])
         another_event = test_task.extend([another_msg])
-        self.assertEquals(test_task.element_count, 2)
+        self.assertEqual(test_task.element_count, 2)
         self.assertTrue(an_event.cancel())
-        self.assertEquals(test_task.element_count, 1)
+        self.assertEqual(test_task.element_count, 1)
         self.assertFalse(an_event.cancel())
-        self.assertEquals(test_task.element_count, 1)
+        self.assertEqual(test_task.element_count, 1)
         test_task.run()
-        self.assertEquals(test_task.element_count, 0)
-        self.assertEquals(_Bundled([another_msg]), another_event.result)
+        self.assertEqual(test_task.element_count, 0)
+        self.assertEqual(_Bundled([another_msg]), another_event.result)
         self.assertFalse(an_event.is_set())
         self.assertIsNone(an_event.result)
 
@@ -301,8 +301,8 @@ class TestExecutor(unittest2.TestCase):
             self.assertTrue(
                 got_event.is_set(),
                 'event is not set after triggering element')
-            self.assertEquals(_Bundled([an_elt] * threshold),
-                              got_event.result)
+            self.assertEqual(_Bundled([an_elt] * threshold),
+                             got_event.result)
 
     def test_each_event_has_exception_when_demuxed_api_call_fails(self):
         an_elt = 'dummy message'
@@ -366,8 +366,8 @@ class TestExecutor(unittest2.TestCase):
                 self.assertTrue(previous_event != event)
             self.assertTrue(event.is_set(),
                             'event is not set after triggering element')
-            self.assertEquals(event.result,
-                              _Bundled(['%s%d' % (an_elt, index)] * index))
+            self.assertEqual(event.result,
+                             _Bundled(['%s%d' % (an_elt, index)] * index))
             previous_event = event
 
     def test_each_event_has_same_result_from_mismatched_demuxed_api_call(self):
@@ -394,7 +394,7 @@ class TestExecutor(unittest2.TestCase):
                 self.assertTrue(previous_event != event)
             self.assertTrue(event.is_set(),
                             'event is not set after triggering element')
-            self.assertEquals(event.result, mismatched_result)
+            self.assertEqual(event.result, mismatched_result)
             previous_event = event
 
     def test_schedule_passes_kwargs(self):
@@ -409,8 +409,8 @@ class TestExecutor(unittest2.TestCase):
             _Bundled([an_elt]),
             {'an_option': 'a_value'}
         )
-        self.assertEquals('a_value',
-                          event.result['an_option'])
+        self.assertEqual('a_value',
+                         event.result['an_option'])
 
 
 class TestExecutor_ElementCountTrigger(unittest2.TestCase):
@@ -437,8 +437,8 @@ class TestExecutor_ElementCountTrigger(unittest2.TestCase):
                 self.assertIsNone(got_event.result)
             else:
                 self.assertTrue(got_event.is_set())
-                self.assertEquals(_Bundled([an_elt] * threshold),
-                                  got_event.result)
+                self.assertEqual(_Bundled([an_elt] * threshold),
+                                 got_event.result)
 
 
 class TestExecutor_RequestByteTrigger(unittest2.TestCase):
@@ -466,8 +466,8 @@ class TestExecutor_RequestByteTrigger(unittest2.TestCase):
                 self.assertIsNone(got_event.result)
             else:
                 self.assertTrue(got_event.is_set())
-                self.assertEquals(_Bundled([an_elt] * elts_for_threshold),
-                                  got_event.result)
+                self.assertEqual(_Bundled([an_elt] * elts_for_threshold),
+                                 got_event.result)
 
 
 class TestExecutor_DelayThreshold(unittest2.TestCase):
@@ -490,8 +490,8 @@ class TestExecutor_DelayThreshold(unittest2.TestCase):
         self.assertIsNone(got_event.result)
         self.assertTrue(timer_class.called)
         timer_args, timer_kwargs = timer_class.call_args_list[0]
-        self.assertEquals(delay_threshold, timer_args[0])
-        self.assertEquals({'args': [an_id]}, timer_kwargs)
+        self.assertEqual(delay_threshold, timer_args[0])
+        self.assertEqual({'args': [an_id]}, timer_kwargs)
         timer_class.return_value.start.assert_called_once_with()
 
 

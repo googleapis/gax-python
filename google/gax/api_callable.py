@@ -31,8 +31,9 @@
 
 from __future__ import absolute_import, division
 import random
-import sys
 import time
+
+from future.utils import raise_with_traceback
 
 from . import (BackoffSettings, BundleOptions, bundling, CallSettings, config,
                PageIterator, ResourceIterator, RetryOptions)
@@ -429,8 +430,7 @@ def _catch_errors(a_func, errors):
             return a_func(*args, **kwargs)
         # pylint: disable=catching-non-exception
         except tuple(errors) as exception:
-            raise (GaxError('RPC failed', cause=exception), None,
-                   sys.exc_info()[2])
+            raise_with_traceback(GaxError('RPC failed', cause=exception))
 
     return inner
 

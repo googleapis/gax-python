@@ -58,7 +58,7 @@ class TestCreateStub(unittest2.TestCase):
         chan.assert_called_once_with(self.FAKE_SERVICE_PATH, self.FAKE_PORT,
                                      comp.return_value)
         auth.assert_called_once_with([])
-        self.assertEquals(got_channel, chan.return_value)
+        self.assertEqual(got_channel, chan.return_value)
 
     @mock.patch('grpc.beta.implementations.composite_channel_credentials')
     @mock.patch('grpc.beta.implementations.ssl_channel_credentials')
@@ -86,7 +86,7 @@ class TestCreateStub(unittest2.TestCase):
         got_channel = grpc.create_stub(
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             channel=fake_channel)
-        self.assertEquals(got_channel, fake_channel)
+        self.assertEqual(got_channel, fake_channel)
         self.assertFalse(auth.called)
         self.assertFalse(chan_creds.called)
         self.assertFalse(chan.called)
@@ -111,7 +111,7 @@ class TestCreateStub(unittest2.TestCase):
         self.assertFalse(chan_creds.called)
         self.assertTrue(comp.called)
         self.assertTrue(md.called)
-        self.assertEquals(got_channel, chan.return_value)
+        self.assertEqual(got_channel, chan.return_value)
 
     @mock.patch('grpc.beta.implementations.composite_channel_credentials')
     @mock.patch('grpc.beta.implementations.ssl_channel_credentials')

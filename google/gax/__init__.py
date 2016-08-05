@@ -431,6 +431,10 @@ class PageIterator(object):
         return self
 
     def next(self):
+        """For Python 2.7 compatibility; see __next__."""
+        return self.__next__()
+
+    def __next__(self):
         """Retrieves the next page."""
         if self._done:
             raise StopIteration
@@ -456,7 +460,7 @@ class ResourceIterator(object):
         Args:
           page_iterator (PageIterator): the base iterator of getting pages.
         """
-        self._iterator = page_iterator
+        self._page_iterator = page_iterator
         self._current = None
         self._index = -1
 
@@ -464,10 +468,14 @@ class ResourceIterator(object):
         return self
 
     def next(self):
+        """For Python 2.7 compatibility; see __next__."""
+        return self.__next__()
+
+    def __next__(self):
         """Retrieves the next resource."""
         # pylint: disable=next-method-called
         while not self._current:
-            self._current = self._iterator.next()
+            self._current = next(self._page_iterator)
             self._index = 0
         resource = self._current[self._index]
         self._index += 1

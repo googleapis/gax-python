@@ -131,9 +131,9 @@ class TestCreateApiCallable(unittest2.TestCase):
         settings = CallSettings(kwargs={'key': 'value'})
         my_callable = api_callable.create_api_call(
             lambda _req, _timeout, **kwargs: kwargs['key'], settings)
-        self.assertEquals(my_callable(None), 'value')
-        self.assertEquals(my_callable(None, CallOptions(key='updated')),
-                          'updated')
+        self.assertEqual(my_callable(None), 'value')
+        self.assertEqual(my_callable(None, CallOptions(key='updated')),
+                         'updated')
 
     @mock.patch('time.time')
     @mock.patch('google.gax.config.exc_to_code')
@@ -313,8 +313,7 @@ class TestCreateApiCallable(unittest2.TestCase):
                 return PageStreamingResponse(nums=list(range(page_size)),
                                              next_page_token=page_size)
 
-        with mock.patch('grpc.framework.crust.implementations.'
-                        '_UnaryUnaryMultiCallable') as mock_grpc:
+        with mock.patch('grpc.UnaryUnaryMultiCallable') as mock_grpc:
             mock_grpc.side_effect = grpc_return_value
             settings = CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0)
@@ -371,7 +370,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertIsInstance(first, bundling.Event)
         self.assertIsNone(first.result)  # pylint: disable=no-member
         second = my_callable(BundlingRequest([0] * 5))
-        self.assertEquals(second.result, 8)  # pylint: disable=no-member
+        self.assertEqual(second.result, 8)  # pylint: disable=no-member
 
     def test_construct_settings(self):
         defaults = api_callable.construct_settings(
@@ -385,14 +384,14 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
         self.assertIsNone(settings.page_descriptor)
         self.assertIsInstance(settings.retry, RetryOptions)
-        self.assertEquals(settings.kwargs, {'key1': 'value1'})
+        self.assertEqual(settings.kwargs, {'key1': 'value1'})
         settings = defaults['page_streaming_method']
         self.assertAlmostEqual(settings.timeout, 12.0)
         self.assertIsNone(settings.bundler)
         self.assertIsNone(settings.bundle_descriptor)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
         self.assertIsInstance(settings.retry, RetryOptions)
-        self.assertEquals(settings.kwargs, {'key1': 'value1'})
+        self.assertEqual(settings.kwargs, {'key1': 'value1'})
 
     def test_construct_settings_override(self):
         _override = {
@@ -455,8 +454,8 @@ class TestCreateApiCallable(unittest2.TestCase):
             page_descriptors=_PAGE_DESCRIPTORS)
         settings = defaults['bundling_method']
         backoff = settings.retry.backoff_settings
-        self.assertEquals(backoff.initial_retry_delay_millis, 1000)
-        self.assertEquals(settings.retry.retry_codes, [_RETRY_DICT['code_a']])
+        self.assertEqual(backoff.initial_retry_delay_millis, 1000)
+        self.assertEqual(settings.retry.retry_codes, [_RETRY_DICT['code_a']])
         self.assertIsInstance(settings.bundler, bundling.Executor)
         self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
 
@@ -465,10 +464,10 @@ class TestCreateApiCallable(unittest2.TestCase):
         # not affect the methods which are not in the overrides.
         settings = defaults['page_streaming_method']
         backoff = settings.retry.backoff_settings
-        self.assertEquals(backoff.initial_retry_delay_millis, 100)
-        self.assertEquals(backoff.retry_delay_multiplier, 1.2)
-        self.assertEquals(backoff.max_retry_delay_millis, 1000)
-        self.assertEquals(settings.retry.retry_codes, [_RETRY_DICT['code_c']])
+        self.assertEqual(backoff.initial_retry_delay_millis, 100)
+        self.assertEqual(backoff.retry_delay_multiplier, 1.2)
+        self.assertEqual(backoff.max_retry_delay_millis, 1000)
+        self.assertEqual(settings.retry.retry_codes, [_RETRY_DICT['code_c']])
 
     @mock.patch('google.gax.config.API_ERRORS', (CustomException, ))
     def test_catch_error(self):

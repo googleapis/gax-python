@@ -179,8 +179,8 @@ class Task(object):
             in_sizes = [len(elts) for elts in self._in_deque]
             all_subresponses = getattr(resp, subresponse_field)
             if len(all_subresponses) != sum(in_sizes):
-                _LOG.warn(_WARN_DEMUX_MISMATCH, len(all_subresponses),
-                          sum(in_sizes))
+                _LOG.warning(_WARN_DEMUX_MISMATCH, len(all_subresponses),
+                             sum(in_sizes))
                 for event in self._event_deque:
                     event.result = resp
                     event.set()
@@ -251,7 +251,7 @@ class Task(object):
         return canceller
 
 
-TIMER_FACTORY = threading.Timer
+TIMER_FACTORY = threading.Timer  # pylint: disable=invalid-name
 """A class with an interface similar to threading.Timer.
 
 Defaults to threading.Timer.  This makes it easy to plug-in alternate

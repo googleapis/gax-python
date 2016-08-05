@@ -1,9 +1,11 @@
 sudo: false
 env:
-  - BREW_HOME=$HOME/.linuxbrew
+  - BREW_HOME=$HOME/.linuxbrew PATH=$BREW_HOME/bin:$PATH
 
 # Protobuf is very expensive to install, so we cache it between builds
-before_install: ./install-protobuf3.sh
+before_install:
+  - pip install --upgrade pip
+  - ./install-protobuf3.sh
 cache:
   directories:
     - $BREW_HOME
@@ -11,6 +13,8 @@ cache:
 language: python
 python:
   - "2.7"
+  - "3.4"
+  - "3.5"
 install: pip install codecov tox-travis
 script: tox
 after_success:
