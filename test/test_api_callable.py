@@ -301,7 +301,7 @@ class TestCreateApiCallable(unittest2.TestCase):
             'page_token', 'next_page_token', 'nums')
 
         def grpc_return_value(request, *dummy_args, **dummy_kwargs):
-            start = int(request.page_token) if request.page_token else 0
+            start = int(request.page_token)
             if start > 0 and start < page_size * pages_to_stream:
                 return PageStreamingResponse(
                     nums=list(range(start,

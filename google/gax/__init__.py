@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 
 
-__version__ = '0.12.4'
+__version__ = '0.12.5'
 
 
 INITIAL_PAGE = object()
@@ -420,7 +420,7 @@ class PageIterator(object):
           A PageIterator object.
         """
         self.response = None
-        self.page_token = page_token
+        self.page_token = page_token or INITIAL_PAGE
         self._func = api_call
         self._page_descriptor = page_descriptor
         self._request = request
