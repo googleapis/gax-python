@@ -35,7 +35,7 @@ from __future__ import absolute_import
 import unittest2
 
 from google.gax import (
-    BundleOptions, CallOptions, CallSettings, INITIAL_PAGE, OPTION_INHERIT,
+    BundleOptions, CallOptions, _CallSettings, INITIAL_PAGE, OPTION_INHERIT,
     RetryOptions)
 
 
@@ -72,7 +72,7 @@ class TestCallSettings(unittest2.TestCase):
 
     def test_settings_merge_options1(self):
         options = CallOptions(timeout=46)
-        settings = CallSettings(timeout=9, page_descriptor=None, retry=None)
+        settings = _CallSettings(timeout=9, page_descriptor=None, retry=None)
         final = settings.merge(options)
         self.assertEqual(final.timeout, 46)
         self.assertIsNone(final.retry)
@@ -81,7 +81,7 @@ class TestCallSettings(unittest2.TestCase):
     def test_settings_merge_options2(self):
         retry = RetryOptions(None, None)
         options = CallOptions(retry=retry)
-        settings = CallSettings(
+        settings = _CallSettings(
             timeout=9, page_descriptor=None, retry=RetryOptions(None, None))
         final = settings.merge(options)
         self.assertEqual(final.timeout, 9)
@@ -92,8 +92,8 @@ class TestCallSettings(unittest2.TestCase):
         retry = RetryOptions(None, None)
         page_descriptor = object()
         options = CallOptions(timeout=46, page_token=INITIAL_PAGE)
-        settings = CallSettings(timeout=9, retry=retry,
-                                page_descriptor=page_descriptor)
+        settings = _CallSettings(timeout=9, retry=retry,
+                                 page_descriptor=page_descriptor)
         final = settings.merge(options)
         self.assertEqual(final.timeout, 46)
         self.assertEqual(final.page_descriptor, page_descriptor)
@@ -102,7 +102,7 @@ class TestCallSettings(unittest2.TestCase):
         self.assertEqual(final.retry, retry)
 
     def test_settings_merge_none(self):
-        settings = CallSettings(
+        settings = _CallSettings(
             timeout=23, page_descriptor=object(), bundler=object(),
             retry=object())
         final = settings.merge(None)

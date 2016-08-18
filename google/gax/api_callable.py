@@ -35,7 +35,7 @@ import time
 
 from future import utils
 
-from . import (BackoffSettings, BundleOptions, bundling, CallSettings, config,
+from . import (BackoffSettings, BundleOptions, bundling, _CallSettings, config,
                PageIterator, ResourceIterator, RetryOptions)
 from .errors import GaxError, RetryError
 
@@ -301,7 +301,7 @@ def construct_settings(
         service_name, client_config, config_override,
         retry_names, bundle_descriptors=None, page_descriptors=None,
         kwargs=None):
-    """Constructs a dictionary mapping method names to CallSettings.
+    """Constructs a dictionary mapping method names to _CallSettings.
 
     The ``client_config`` parameter is parsed from a client configuration JSON
     file of the form:
@@ -406,7 +406,7 @@ def construct_settings(
             _construct_retry(overriding_method, overrides.get('retry_codes'),
                              overrides.get('retry_params'), retry_names))
 
-        defaults[snake_name] = CallSettings(
+        defaults[snake_name] = _CallSettings(
             timeout=timeout, retry=retry,
             page_descriptor=page_descriptors.get(snake_name),
             bundler=bundler, bundle_descriptor=bundle_descriptor,
@@ -452,7 +452,7 @@ def create_api_call(func, settings):
 
     Args:
       func (callable[[object], object]): is used to make a bare rpc call
-      settings (:class:`CallSettings`): provides the settings for this call
+      settings (:class:`_CallSettings`): provides the settings for this call
 
     Returns:
       func (callable[[object], object]): a bound method on a request stub used

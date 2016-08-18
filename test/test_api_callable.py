@@ -36,7 +36,7 @@ import unittest2
 
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
-    CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions)
+    _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions)
 from google.gax.errors import GaxError, RetryError
 
 
@@ -116,19 +116,19 @@ class AnotherException(Exception):
 class TestCreateApiCallable(unittest2.TestCase):
 
     def test_call_api_call(self):
-        settings = CallSettings()
+        settings = _CallSettings()
         my_callable = api_callable.create_api_call(
             lambda _req, _timeout: 42, settings)
         self.assertEqual(my_callable(None), 42)
 
     def test_call_override(self):
-        settings = CallSettings(timeout=10)
+        settings = _CallSettings(timeout=10)
         my_callable = api_callable.create_api_call(
             lambda _req, timeout: timeout, settings)
         self.assertEqual(my_callable(None, CallOptions(timeout=20)), 20)
 
     def test_call_kwargs(self):
-        settings = CallSettings(kwargs={'key': 'value'})
+        settings = _CallSettings(kwargs={'key': 'value'})
         my_callable = api_callable.create_api_call(
             lambda _req, _timeout, **kwargs: kwargs['key'], settings)
         self.assertEqual(my_callable(None), 'value')
@@ -150,7 +150,7 @@ class TestCreateApiCallable(unittest2.TestCase):
                                  (to_attempt - 1) + [mock.DEFAULT])
         mock_call.return_value = 1729
         mock_time.return_value = 0
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertEqual(my_callable(None), 1729)
         self.assertEqual(mock_call.call_count, to_attempt)
@@ -163,7 +163,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
         mock_time.return_value = 0
 
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertRaises(CustomException, my_callable, None)
         self.assertEqual(mock_call.call_count, 1)
@@ -179,7 +179,7 @@ class TestCreateApiCallable(unittest2.TestCase):
             BackoffSettings(0, 0, 0, 0, 0, 0, 1))
         mock_time.side_effect = [0, 2]
         mock_exc_to_code.side_effect = lambda e: e.code
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(fake_call, settings)
 
         try:
@@ -198,7 +198,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call = mock.Mock()
         mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
         mock_time.side_effect = ([0] * to_attempt + [2])
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(mock_call, settings)
 
         try:
@@ -219,7 +219,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         mock_call = mock.Mock()
         mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_2)
         mock_time.return_value = 0
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertRaises(Exception, my_callable, None)
         self.assertEqual(mock_call.call_count, 1)
@@ -230,7 +230,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         retry = RetryOptions(
             [_FAKE_STATUS_CODE_1],
             BackoffSettings(0, 0, 0, 0, 0, 0, 0))
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(lambda: None, settings)
 
         self.assertRaises(RetryError, my_callable, None)
@@ -258,7 +258,7 @@ class TestCreateApiCallable(unittest2.TestCase):
 
         params = BackoffSettings(3, 2, 24, 5, 2, 80, 2500)
         retry = RetryOptions([_FAKE_STATUS_CODE_1], params)
-        settings = CallSettings(timeout=0, retry=retry)
+        settings = _CallSettings(timeout=0, retry=retry)
         my_callable = api_callable.create_api_call(mock_call, settings)
 
         try:
@@ -315,7 +315,7 @@ class TestCreateApiCallable(unittest2.TestCase):
 
         with mock.patch('grpc.UnaryUnaryMultiCallable') as mock_grpc:
             mock_grpc.side_effect = grpc_return_value
-            settings = CallSettings(
+            settings = _CallSettings(
                 page_descriptor=fake_grpc_func_descriptor, timeout=0)
             my_callable = api_callable.create_api_call(
                 mock_grpc, settings=settings)
@@ -344,7 +344,7 @@ class TestCreateApiCallable(unittest2.TestCase):
                              expected)
 
     def test_bundling_page_streaming_error(self):
-        settings = CallSettings(
+        settings = _CallSettings(
             page_descriptor=object(), bundle_descriptor=object(),
             bundler=object())
         with self.assertRaises(ValueError):
@@ -362,7 +362,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         def my_func(request, dummy_timeout):
             return len(request.elements)
 
-        settings = CallSettings(
+        settings = _CallSettings(
             bundler=bundler, bundle_descriptor=fake_grpc_func_descriptor,
             timeout=0)
         my_callable = api_callable.create_api_call(my_func, settings)
@@ -478,9 +478,9 @@ class TestCreateApiCallable(unittest2.TestCase):
             raise AnotherException
 
         gax_error_callable = api_callable.create_api_call(
-            abortion_error_func, CallSettings())
+            abortion_error_func, _CallSettings())
         self.assertRaises(GaxError, gax_error_callable, None)
 
         other_error_callable = api_callable.create_api_call(
-            other_error_func, CallSettings())
+            other_error_func, _CallSettings())
         self.assertRaises(AnotherException, other_error_callable, None)
