@@ -50,9 +50,9 @@ with open('google/gax/__init__.py', 'r') as f:
 
 install_requires = [
     'future>=0.15.2',
-    'grpcio>=1.0rc1',
+    'grpcio>=1.0.0',
     'ply==3.8',
-    'protobuf>=3.0.0b3',
+    'protobuf>=3.0.0',
     'oauth2client>=1.5.2',
 ]
 

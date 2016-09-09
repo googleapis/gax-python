@@ -30,8 +30,8 @@
 """Adapts the grpc surface."""
 
 from __future__ import absolute_import
-from grpc.beta import implementations
-from grpc.beta.interfaces import StatusCode
+import grpc
+from grpc import StatusCode
 from grpc.framework.interfaces.face import face
 from . import auth
 
@@ -82,8 +82,8 @@ def _make_grpc_auth_func(auth_func):
 def _make_channel_creds(auth_func, ssl_creds):
     """Converts the auth func into the composite creds expected by grpc."""
     grpc_auth_func = _make_grpc_auth_func(auth_func)
-    call_creds = implementations.metadata_call_credentials(grpc_auth_func)
-    return implementations.composite_channel_credentials(ssl_creds, call_creds)
+    call_creds = grpc.metadata_call_credentials(grpc_auth_func)
+    return grpc.composite_channel_credentials(ssl_creds, call_creds)
 
 
 def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
@@ -108,15 +108,14 @@ def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
     """
     if channel is None:
         if ssl_creds is None:
-            ssl_creds = implementations.ssl_channel_credentials(
-                None, None, None)
+            ssl_creds = grpc.ssl_channel_credentials()
         if metadata_transformer is None:
             if scopes is None:
                 scopes = []
             metadata_transformer = auth.make_auth_func(scopes)
 
         channel_creds = _make_channel_creds(metadata_transformer, ssl_creds)
-        channel = implementations.secure_channel(
-            service_path, port, channel_creds)
+        target = '{}:{}'.format(service_path, port)
+        channel = grpc.secure_channel(target, channel_creds)
 
     return generated_create_stub(channel)
