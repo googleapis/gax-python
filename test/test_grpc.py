@@ -126,3 +126,16 @@ class TestCreateStub(unittest2.TestCase):
             _fake_create_stub, self.FAKE_SERVICE_PATH, self.FAKE_PORT,
             metadata_transformer=lambda x: tuple())
         self.assertFalse(auth.called)
+
+
+class TestErrors(unittest2.TestCase):
+    class MyError(grpc.RpcError):
+        def code(self):
+            return grpc.StatusCode.UNKNOWN
+
+    def test_exc_to_code(self):
+        code = grpc.exc_to_code(TestErrors.MyError())
+        self.assertEqual(code, grpc.StatusCode.UNKNOWN)
+        self.assertEqual(code, grpc.STATUS_CODE_NAMES['UNKNOWN'])
+        self.assertIsNone(grpc.exc_to_code(Exception))
+        self.assertIsNone(grpc.exc_to_code(grpc.RpcError()))

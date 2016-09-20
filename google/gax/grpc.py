@@ -31,12 +31,11 @@
 
 from __future__ import absolute_import
 import grpc
-from grpc import StatusCode
-from grpc.framework.interfaces.face import face
+from grpc import RpcError, StatusCode
 from . import auth
 
 
-API_ERRORS = (face.AbortionError, )
+API_ERRORS = (RpcError, )
 """gRPC exceptions that indicate that an RPC was aborted."""
 
 
@@ -61,12 +60,13 @@ STATUS_CODE_NAMES = {
 
 def exc_to_code(exc):
     """Retrieves the status code from an exception"""
-    if not isinstance(exc, face.AbortionError):
+    if not isinstance(exc, RpcError):
         return None
-    elif isinstance(exc, face.ExpirationError):
-        return StatusCode.DEADLINE_EXCEEDED
     else:
-        return getattr(exc, 'code', None)
+        try:
+            return exc.code()
+        except AttributeError:
+            return None
 
 
 def _make_grpc_auth_func(auth_func):
