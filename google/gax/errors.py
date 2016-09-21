@@ -29,6 +29,9 @@
 
 """Provides GAX exceptions."""
 
+from __future__ import absolute_import
+from . import config
+
 
 class GaxError(Exception):
     """Common base class for exceptions raised by GAX.
@@ -49,6 +52,25 @@ class GaxError(Exception):
             return msg
 
         return 'GaxError({}, caused by {})'.format(msg, self.cause)
+
+
+def create_error(msg, cause=None):
+    """Creates an error.
+
+    Uses a Python built-in exception if one is available, and a
+    GaxError otherwise.
+
+    Attributes:
+      msg (string): describes the error that occurred.
+      cause (Exception, optional): the exception raised by a lower
+        layer of the RPC stack (for example, gRPC) that caused this
+        exception, or None if this exception originated in GAX.
+    """
+    if config.NAME_STATUS_CODES.get(
+            config.exc_to_code(cause)) == 'INVALID_ARGUMENT':
+        return ValueError('{}: {}'.format(msg, cause))
+    else:
+        return GaxError(msg, cause)
 
 
 class RetryError(GaxError):

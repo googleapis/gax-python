@@ -36,8 +36,8 @@ import time
 from future import utils
 
 from . import (BackoffSettings, BundleOptions, bundling, _CallSettings, config,
-               PageIterator, ResourceIterator, RetryOptions)
-from .errors import GaxError, RetryError
+               errors, PageIterator, ResourceIterator, RetryOptions)
+from .errors import RetryError
 
 _MILLIS_PER_SECOND = 1000
 
@@ -414,12 +414,12 @@ def construct_settings(
     return defaults
 
 
-def _catch_errors(a_func, errors):
+def _catch_errors(a_func, to_catch):
     """Updates a_func to wrap exceptions with GaxError
 
     Args:
         a_func (callable): A callable.
-        retry (list[Exception]): Configures the exceptions to wrap.
+        to_catch (list[Exception]): Configures the exceptions to wrap.
 
     Returns:
         A function that will wrap certain exceptions with GaxError
@@ -429,8 +429,9 @@ def _catch_errors(a_func, errors):
         try:
             return a_func(*args, **kwargs)
         # pylint: disable=catching-non-exception
-        except tuple(errors) as exception:
-            utils.raise_with_traceback(GaxError('RPC failed', cause=exception))
+        except tuple(to_catch) as exception:
+            utils.raise_with_traceback(
+                errors.create_error('RPC failed', cause=exception))
 
     return inner
 

@@ -38,6 +38,7 @@ from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
     _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions)
 from google.gax.errors import GaxError, RetryError
+import grpc
 
 
 _SERVICE_NAME = 'test.interface.v1.api'
@@ -484,3 +485,15 @@ class TestCreateApiCallable(unittest2.TestCase):
         other_error_callable = api_callable.create_api_call(
             other_error_func, _CallSettings())
         self.assertRaises(AnotherException, other_error_callable, None)
+
+    def test_wrap_value_error(self):
+
+        invalid_attribute_exc = grpc.RpcError()
+        invalid_attribute_exc.code = lambda: grpc.StatusCode.INVALID_ARGUMENT
+
+        def value_error_func(*dummy_args, **dummy_kwargs):
+            raise invalid_attribute_exc
+
+        value_error_callable = api_callable.create_api_call(
+            value_error_func, _CallSettings())
+        self.assertRaises(ValueError, value_error_callable, None)

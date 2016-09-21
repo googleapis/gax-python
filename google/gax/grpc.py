@@ -58,6 +58,10 @@ STATUS_CODE_NAMES = {
 """Maps strings used in client config to gRPC status codes."""
 
 
+NAME_STATUS_CODES = dict([(v, k) for (k, v) in STATUS_CODE_NAMES.items()])
+"""Inverse map for STATUS_CODE_NAMES"""
+
+
 def exc_to_code(exc):
     """Retrieves the status code from an exception"""
     if not isinstance(exc, RpcError):

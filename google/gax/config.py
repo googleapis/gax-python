@@ -49,6 +49,10 @@ the client constants configuration for retrying into the correct gRPC objects.
 """
 
 
+NAME_STATUS_CODES = grpc.NAME_STATUS_CODES
+"""Inverse map for STATUS_CODE_NAMES"""
+
+
 create_stub = grpc.create_stub  # pylint: disable=invalid-name,
 """The function to use to create stubs."""
 
