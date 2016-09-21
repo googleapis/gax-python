@@ -30,7 +30,7 @@ provide a more convenient and idiomatic API surface to callers.
 Python Versions
 ---------------
 
-gax-python is currently tested with Python 2.7.
+gax-python is currently tested with Python 2.7, 3.4, and 3.5.
 
 
 Contributing
