@@ -17,7 +17,6 @@ based on `GRPC`_ and `Google APIs`_ conventions.
    :toctree: generated
 
    google.gax
-   google.gax.auth
    google.gax.api_callable
    google.gax.bundling
    google.gax.config

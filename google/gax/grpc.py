@@ -30,9 +30,9 @@
 """Adapts the grpc surface."""
 
 from __future__ import absolute_import
-import grpc
+
 from grpc import RpcError, StatusCode
-from . import auth
+from . import _grpc_oauth2client
 
 
 API_ERRORS = (RpcError, )
@@ -73,53 +73,36 @@ def exc_to_code(exc):
             return None
 
 
-def _make_grpc_auth_func(auth_func):
-    """Creates the auth func expected by the grpc callback."""
-
-    def grpc_auth(dummy_context, callback):
-        """The auth signature required by grpc."""
-        callback(auth_func(), None)
-
-    return grpc_auth
-
-
-def _make_channel_creds(auth_func, ssl_creds):
-    """Converts the auth func into the composite creds expected by grpc."""
-    grpc_auth_func = _make_grpc_auth_func(auth_func)
-    call_creds = grpc.metadata_call_credentials(grpc_auth_func)
-    return grpc.composite_channel_credentials(ssl_creds, call_creds)
-
-
-def create_stub(generated_create_stub, service_path, port, ssl_creds=None,
-                channel=None, metadata_transformer=None, scopes=None):
+def create_stub(generated_create_stub, channel=None, service_path=None,
+                service_port=None, credentials=None, scopes=None,
+                ssl_credentials=None):
     """Creates a gRPC client stub.
 
     Args:
         generated_create_stub: The generated gRPC method to create a stub.
-        service_path: The domain name of the API remote host.
-        port: The port on which to connect to the remote host.
-        ssl_creds: A ClientCredentials object for use with an SSL-enabled
-            Channel. If none, credentials are pulled from a default location.
         channel: A Channel object through which to make calls. If none, a secure
-            channel is constructed.
-        metadata_transformer: A function that transforms the metadata for
-            requests, e.g., to give OAuth credentials.
+            channel is constructed. If specified, all remaining arguments are
+            ignored.
+        service_path: The domain name of the API remote host.
+        service_port: The port on which to connect to the remote host.
+        credentials: The authorization credentials to attach to requests.
+            These credentials identify your application to the service.
         scopes: The OAuth scopes for this service. This parameter is ignored if
-            a custom metadata_transformer is supplied.
+            a credentials is specified.
+        ssl_credentials: gRPC channel credentials used to create a secure
+            gRPC channel. If not specified, SSL credentials will be created
+            using default certificates.
 
     Returns:
         A gRPC client stub.
     """
     if channel is None:
-        if ssl_creds is None:
-            ssl_creds = grpc.ssl_channel_credentials()
-        if metadata_transformer is None:
-            if scopes is None:
-                scopes = []
-            metadata_transformer = auth.make_auth_func(scopes)
+        target = '{}:{}'.format(service_path, service_port)
 
-        channel_creds = _make_channel_creds(metadata_transformer, ssl_creds)
-        target = '{}:{}'.format(service_path, port)
-        channel = grpc.secure_channel(target, channel_creds)
+        if credentials is None:
+            credentials = _grpc_oauth2client.get_default_credentials(scopes)
+
+        channel = _grpc_oauth2client.secure_authorized_channel(
+            credentials, target, ssl_credentials=ssl_credentials)
 
     return generated_create_stub(channel)

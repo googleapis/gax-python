@@ -28,29 +28,70 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
-"""Unit tests for auth."""
+"""Unit tests for _grpc_oauth2client."""
 
 from __future__ import absolute_import
 
 import mock
 import unittest2
 
-from google.gax import auth
+from google.gax import _grpc_oauth2client
 
 
-class TestMakeAuthFunc(unittest2.TestCase):
+class TestAuthMetadataPlugin(unittest2.TestCase):
+    TEST_TOKEN = 'an_auth_token'
+
+    def test(self):
+        credentials = mock.Mock()
+        credentials.get_access_token.return_value = mock.Mock(
+            access_token=self.TEST_TOKEN)
+
+        metadata_plugin = _grpc_oauth2client.AuthMetadataPlugin(credentials)
+
+        self.assertFalse(credentials.create_scoped.called)
+
+        callback = mock.Mock()
+        metadata_plugin(None, callback)
+
+        callback.assert_called_once_with([
+            ('authorization', 'Bearer {}'.format(self.TEST_TOKEN))], None)
+
+
+class TestGetDefaultCredentials(unittest2.TestCase):
     TEST_TOKEN = 'an_auth_token'
 
     @mock.patch('oauth2client.client.GoogleCredentials.get_application_default')
-    def test_uses_application_default_credentials(self, factory):
+    def test(self, factory):
         creds = mock.Mock()
         creds.get_access_token.return_value = mock.Mock(
             access_token=self.TEST_TOKEN)
         factory_mock_config = {'create_scoped.return_value': creds}
         factory.return_value = mock.Mock(**factory_mock_config)
         fake_scopes = ['fake', 'scopes']
-        the_func = auth.make_auth_func(fake_scopes)
+
+        got = _grpc_oauth2client.get_default_credentials(fake_scopes)
+
         factory.return_value.create_scoped.assert_called_once_with(fake_scopes)
-        got = the_func()
-        want = [('authorization', 'Bearer an_auth_token')]
-        self.assertEqual(got, want)
+        self.assertEqual(got, creds)
+
+
+class TestSecureAuthorizedChannel(unittest2.TestCase):
+    FAKE_TARGET = 'service_path:10101'
+
+    @mock.patch('grpc.composite_channel_credentials')
+    @mock.patch('grpc.ssl_channel_credentials')
+    @mock.patch('grpc.secure_channel')
+    @mock.patch('google.gax._grpc_oauth2client.AuthMetadataPlugin')
+    def test(
+            self, auth_metadata_plugin, secure_channel, ssl_channel_credentials,
+            composite_channel_credentials):
+        credentials = mock.Mock()
+
+        got_channel = _grpc_oauth2client.secure_authorized_channel(
+            credentials, self.FAKE_TARGET)
+
+        ssl_channel_credentials.assert_called_once_with()
+        secure_channel.assert_called_once_with(
+            self.FAKE_TARGET, composite_channel_credentials.return_value)
+        auth_metadata_plugin.assert_called_once_with(credentials)
+        self.assertEqual(got_channel, secure_channel.return_value)
