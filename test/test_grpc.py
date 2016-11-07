@@ -46,8 +46,8 @@ class TestCreateStub(unittest2.TestCase):
     FAKE_SERVICE_PATH = 'service_path'
     FAKE_PORT = 10101
 
-    @mock.patch('google.gax._grpc_oauth2client.get_default_credentials')
-    @mock.patch('google.gax._grpc_oauth2client.secure_authorized_channel')
+    @mock.patch('google.gax.grpc._grpc_auth.get_default_credentials')
+    @mock.patch('google.gax.grpc._grpc_auth.secure_authorized_channel')
     def test_creates_a_stub_with_default_credentials(
             self, secure_authorized_channel, get_default_credentials):
         fake_scopes = ['one', 'two']
@@ -63,8 +63,8 @@ class TestCreateStub(unittest2.TestCase):
 
         self.assertEqual(got_channel, secure_authorized_channel.return_value)
 
-    @mock.patch('google.gax._grpc_oauth2client.get_default_credentials')
-    @mock.patch('google.gax._grpc_oauth2client.secure_authorized_channel')
+    @mock.patch('google.gax.grpc._grpc_auth.get_default_credentials')
+    @mock.patch('google.gax.grpc._grpc_auth.secure_authorized_channel')
     def test_creates_a_stub_with_explicit_credentials(
             self, secure_authorized_channel, get_default_credentials):
         credentials = mock.Mock()
@@ -80,8 +80,8 @@ class TestCreateStub(unittest2.TestCase):
 
         self.assertEqual(got_channel, secure_authorized_channel.return_value)
 
-    @mock.patch('google.gax._grpc_oauth2client.get_default_credentials')
-    @mock.patch('google.gax._grpc_oauth2client.secure_authorized_channel')
+    @mock.patch('google.gax.grpc._grpc_auth.get_default_credentials')
+    @mock.patch('google.gax.grpc._grpc_auth.secure_authorized_channel')
     def test_creates_a_stub_with_given_channel(
             self, secure_authorized_channel, get_default_credentials):
         fake_channel = mock.Mock()
