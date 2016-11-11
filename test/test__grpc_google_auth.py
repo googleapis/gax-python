@@ -45,24 +45,22 @@ from six.moves import reload_module
 
 
 class TestGetDefaultCredentials(unittest2.TestCase):
-    @mock.patch('google.auth.default')
+    @mock.patch('google.auth.default', autospec=True)
     def test(self, default_mock):
-        credentials = mock.Mock(
-            token='token', requires_scopes=True,
-            spec=google.auth.credentials.Scoped)
-        credentials.with_scopes.return_value = credentials
-        default_mock.return_value = credentials, 'project'
-        fake_scopes = ['fake', 'scopes']
+        default_mock.return_value = (
+            mock.sentinel.credentials, mock.sentinel.project)
+        scopes = ['fake', 'scopes']
 
-        got = _grpc_google_auth.get_default_credentials(fake_scopes)
+        got = _grpc_google_auth.get_default_credentials(scopes)
 
-        self.assertEqual(got, credentials)
-        credentials.with_scopes.assert_called_once_with(fake_scopes)
+        self.assertEqual(got, mock.sentinel.credentials)
+        default_mock.assert_called_once_with(scopes)
 
 
 class TestSecureAuthorizedChannel(unittest2.TestCase):
-    @mock.patch('google.gax._grpc_google_auth._request_factory')
-    @mock.patch('google.auth.transport.grpc.secure_authorized_channel')
+    @mock.patch('google.gax._grpc_google_auth._request_factory', autospec=True)
+    @mock.patch(
+        'google.auth.transport.grpc.secure_authorized_channel', autospec=True)
     def test(self, secure_authorized_channel_mock, request_factory_mock):
 
         got_channel = _grpc_google_auth.secure_authorized_channel(
@@ -71,8 +69,10 @@ class TestSecureAuthorizedChannel(unittest2.TestCase):
 
         request_factory_mock.assert_called_once_with()
         secure_authorized_channel_mock.assert_called_once_with(
-            mock.sentinel.credentials, mock.sentinel.target,
-            request_factory_mock.return_value, ssl_credentials=None)
+            mock.sentinel.credentials,
+            request_factory_mock.return_value,
+            mock.sentinel.target,
+            ssl_credentials=None)
 
         self.assertEqual(
             got_channel, secure_authorized_channel_mock.return_value)

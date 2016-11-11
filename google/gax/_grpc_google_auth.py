@@ -59,12 +59,7 @@ except ImportError:
 
 def get_default_credentials(scopes):
     """Gets the Application Default Credentials."""
-    credentials, _ = google.auth.default()
-
-    if scopes is not None:
-        credentials = google.auth.credentials.with_scopes_if_required(
-            credentials, scopes)
-
+    credentials, _ = google.auth.default(scopes=scopes)
     return credentials
 
 
@@ -73,5 +68,5 @@ def secure_authorized_channel(
     """Creates a secure authorized gRPC channel."""
     http_request = _request_factory()
     return google.auth.transport.grpc.secure_authorized_channel(
-        credentials, target, http_request,
+        credentials, http_request, target,
         ssl_credentials=ssl_credentials)
