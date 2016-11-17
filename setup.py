@@ -49,11 +49,11 @@ with open('google/gax/__init__.py', 'r') as f:
         raise RuntimeError("No version number found!")
 
 install_requires = [
-    'future>=0.15.2',
-    'grpcio>=1.0.0',
+    'future>=0.16.0, <0.17dev',
+    'grpcio>=1.0.0, <2.0dev',
     'ply==3.8',
-    'protobuf>=3.0.0',
-    'oauth2client>=1.5.2',
+    'protobuf>=3.0.0, <4.0dev',
+    'oauth2client>=2.0.0, <4.0dev',
 ]
 
 setup(
