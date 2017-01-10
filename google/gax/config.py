@@ -31,7 +31,7 @@
 
 from __future__ import absolute_import
 
-from . import grpc
+from google.gax import grpc
 
 
 exc_to_code = grpc.exc_to_code  # pylint: disable=invalid-name

@@ -35,10 +35,10 @@ from grpc import RpcError, StatusCode
 
 # Preferentially use google-auth.
 try:
-    from . import _grpc_google_auth as _grpc_auth
+    from google.gax import _grpc_google_auth as _grpc_auth
 # Fallback to oauth2client.
 except ImportError:
-    from . import _grpc_oauth2client as _grpc_auth
+    from google.gax import _grpc_oauth2client as _grpc_auth
 
 
 API_ERRORS = (RpcError, )

@@ -30,7 +30,7 @@
 """Provides GAX exceptions."""
 
 from __future__ import absolute_import
-from . import config
+from google.gax import config
 
 
 class GaxError(Exception):
