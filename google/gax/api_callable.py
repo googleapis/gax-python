@@ -30,105 +30,14 @@
 """Provides function wrappers that implement page streaming and retrying."""
 
 from __future__ import absolute_import, division
-import random
-import time
 
 from future import utils
 
-from . import (BackoffSettings, BundleOptions, bundling, _CallSettings, config,
-               errors, PageIterator, ResourceIterator, RetryOptions)
-from .errors import RetryError
+from google.gax import (BackoffSettings, BundleOptions, bundling, _CallSettings,
+                        config, errors, PageIterator, ResourceIterator,
+                        RetryOptions, retry)
 
 _MILLIS_PER_SECOND = 1000
-
-
-def _add_timeout_arg(a_func, timeout, **kwargs):
-    """Updates a_func so that it gets called with the timeout as its final arg.
-
-    This converts a callable, a_func, into another callable with an additional
-    positional arg.
-
-    Args:
-      a_func (callable): a callable to be updated
-      timeout (int): to be added to the original callable as it final positional
-        arg.
-
-
-    Returns:
-      callable: the original callable updated to the timeout arg
-    """
-
-    def inner(*args):
-        """Updates args with the timeout."""
-        updated_args = args + (timeout,)
-        return a_func(*updated_args, **kwargs)
-
-    return inner
-
-
-def _retryable(a_func, retry, **kwargs):
-    """Creates a function equivalent to a_func, but that retries on certain
-    exceptions.
-
-    Args:
-      a_func (callable): A callable.
-      retry (RetryOptions): Configures the exceptions upon which the callable
-        should retry, and the parameters to the exponential backoff retry
-        algorithm.
-
-    Returns:
-      A function that will retry on exception.
-    """
-
-    delay_mult = retry.backoff_settings.retry_delay_multiplier
-    max_delay = (retry.backoff_settings.max_retry_delay_millis /
-                 _MILLIS_PER_SECOND)
-    timeout_mult = retry.backoff_settings.rpc_timeout_multiplier
-    max_timeout = (retry.backoff_settings.max_rpc_timeout_millis /
-                   _MILLIS_PER_SECOND)
-    total_timeout = (retry.backoff_settings.total_timeout_millis /
-                     _MILLIS_PER_SECOND)
-
-    def inner(*args):
-        """Equivalent to ``a_func``, but retries upon transient failure.
-
-        Retrying is done through an exponential backoff algorithm configured
-        by the options in ``retry``.
-        """
-        delay = retry.backoff_settings.initial_retry_delay_millis
-        timeout = (retry.backoff_settings.initial_rpc_timeout_millis /
-                   _MILLIS_PER_SECOND)
-        exc = RetryError('Retry total timeout exceeded before any'
-                         'response was received')
-        now = time.time()
-        deadline = now + total_timeout
-
-        while now < deadline:
-            try:
-                to_call = _add_timeout_arg(a_func, timeout, **kwargs)
-                return to_call(*args)
-
-            # pylint: disable=broad-except
-            except Exception as exception:
-                if config.exc_to_code(exception) not in retry.retry_codes:
-                    raise RetryError(
-                        'Exception occurred in retry method that was not'
-                        ' classified as transient', exception)
-
-                # pylint: disable=redefined-variable-type
-                exc = RetryError('Retry total timeout exceeded with exception',
-                                 exception)
-                to_sleep = random.uniform(0, delay)
-                time.sleep(to_sleep / _MILLIS_PER_SECOND)
-                now = time.time()
-                delay = min(delay * delay_mult, max_delay)
-                timeout = min(
-                    timeout * timeout_mult, max_timeout, deadline - now)
-                continue
-
-        raise exc
-
-    return inner
 
 
 def _bundleable(desc):
@@ -254,13 +163,13 @@ def _construct_retry(method_config, retry_codes, retry_params, retry_names):
     return RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
 
 
-def _merge_retry_options(retry, overrides):
+def _merge_retry_options(retry_options, overrides):
     """Helper for ``construct_settings()``.
 
     Takes two retry options, and merges them into a single RetryOption instance.
 
     Args:
-      retry: The base RetryOptions.
+      retry_options: The base RetryOptions.
       overrides: The RetryOptions used for overriding ``retry``. Use the values
         if it is not None. If entire ``overrides`` is None, ignore the base
         retry and return None.
@@ -272,12 +181,12 @@ def _merge_retry_options(retry, overrides):
         return None
 
     if overrides.retry_codes is None and overrides.backoff_settings is None:
-        return retry
+        return retry_options
 
-    codes = retry.retry_codes
+    codes = retry_options.retry_codes
     if overrides.retry_codes is not None:
         codes = overrides.retry_codes
-    backoff_settings = retry.backoff_settings
+    backoff_settings = retry_options.backoff_settings
     if overrides.backoff_settings is not None:
         backoff_settings = overrides.backoff_settings
 
@@ -400,14 +309,14 @@ def construct_settings(
             bundling_config = overriding_method['bundling']
         bundler = _construct_bundling(bundling_config, bundle_descriptor)
 
-        retry = _merge_retry_options(
+        retry_options = _merge_retry_options(
             _construct_retry(method_config, service_config['retry_codes'],
                              service_config['retry_params'], retry_names),
             _construct_retry(overriding_method, overrides.get('retry_codes'),
                              overrides.get('retry_params'), retry_names))
 
         defaults[snake_name] = _CallSettings(
-            timeout=timeout, retry=retry,
+            timeout=timeout, retry=retry_options,
             page_descriptor=page_descriptors.get(snake_name),
             bundler=bundler, bundle_descriptor=bundle_descriptor,
             kwargs=kwargs)
@@ -472,10 +381,10 @@ def create_api_call(func, settings):
         """Invoke with the actual settings."""
         this_settings = settings.merge(options)
         if this_settings.retry and this_settings.retry.retry_codes:
-            api_call = _retryable(
+            api_call = retry.retryable(
                 func, this_settings.retry, **this_settings.kwargs)
         else:
-            api_call = _add_timeout_arg(
+            api_call = retry.add_timeout_arg(
                 func, this_settings.timeout, **this_settings.kwargs)
         api_call = _catch_errors(api_call, config.API_ERRORS)
         return api_caller(api_call, this_settings, request)

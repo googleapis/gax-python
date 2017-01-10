@@ -27,16 +27,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name
+# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name,protected-access
 """Unit tests for gax package globals."""
 
 from __future__ import absolute_import
-
+import multiprocessing as mp
+import mock
 import unittest2
 
+from fixture_pb2 import Simple
+from google.longrunning import operations_pb2
+from google.rpc import code_pb2, status_pb2
 from google.gax import (
     BundleOptions, CallOptions, _CallSettings, INITIAL_PAGE, OPTION_INHERIT,
-    RetryOptions)
+    RetryOptions, _OperationFuture)
+from google.gax.errors import GaxError, RetryError
 
 
 class TestBundleOptions(unittest2.TestCase):
@@ -111,3 +116,160 @@ class TestCallSettings(unittest2.TestCase):
         self.assertEqual(final.page_descriptor, settings.page_descriptor)
         self.assertEqual(final.bundler, settings.bundler)
         self.assertEqual(final.bundle_descriptor, settings.bundle_descriptor)
+
+
+def _done_clbk(operation_future):
+    operation_future.test_queue.put(True)
+
+
+class _FakeOperationsClient(object):
+    def __init__(self, operations):
+        self.operations = list(reversed(operations))
+
+    def get_operation(self, *args):  # pylint: disable=unused-argument
+        return self.operations.pop()
+
+    def cancel_operation(self, *args):  # pylint: disable=unused-argument
+        pass
+
+
+class TestOperationFuture(unittest2.TestCase):
+
+    OPERATION_NAME = 'operations/projects/foo/instances/bar/operations/123'
+
+    def _make_operation(self, metadata=None, response=None, error=None,
+                        **kwargs):
+        operation = operations_pb2.Operation(name=self.OPERATION_NAME, **kwargs)
+
+        if metadata is not None:
+            operation.metadata.Pack(metadata)
+
+        if response is not None:
+            operation.response.Pack(response)
+
+        if error is not None:
+            operation.error.CopyFrom(error)
+
+        return operation
+
+    def _make_operation_future(self, *operations):
+        if not operations:
+            operations = [self._make_operation()]
+
+        fake_client = _FakeOperationsClient(operations)
+        return _OperationFuture(operations[0], fake_client, Simple, Simple)
+
+    def test_cancel_issues_call_when_not_done(self):
+        operation = self._make_operation()
+
+        fake_client = _FakeOperationsClient([operation])
+        fake_client.cancel_operation = mock.Mock()
+
+        operation_future = _OperationFuture(
+            operation, fake_client, Simple, Simple)
+
+        self.assertTrue(operation_future.cancel())
+        fake_client.cancel_operation.assert_called_with(self.OPERATION_NAME)
+
+    def test_cancel_does_nothing_when_already_done(self):
+        operation = self._make_operation(done=True)
+
+        fake_client = _FakeOperationsClient([operation])
+        fake_client.cancel_operation = mock.Mock()
+
+        operation_future = _OperationFuture(
+            operation, fake_client, Simple, Simple)
+
+        self.assertFalse(operation_future.cancel())
+        fake_client.cancel_operation.assert_not_called()
+
+    def test_cancelled_true(self):
+        error = status_pb2.Status(code=code_pb2.CANCELLED)
+        operation = self._make_operation(error=error)
+        operation_future = self._make_operation_future(operation)
+
+        self.assertTrue(operation_future.cancelled())
+
+    def test_cancelled_false(self):
+        operation = self._make_operation(error=status_pb2.Status())
+        operation_future = self._make_operation_future(operation)
+        self.assertFalse(operation_future.cancelled())
+
+    def test_done_true(self):
+        operation = self._make_operation(done=True)
+        operation_future = self._make_operation_future(operation)
+        self.assertTrue(operation_future.done())
+
+    def test_done_false(self):
+        operation_future = self._make_operation_future()
+        self.assertFalse(operation_future.done())
+
+    def test_operation_name(self):
+        operation_future = self._make_operation_future()
+        self.assertEqual(self.OPERATION_NAME, operation_future.operation_name())
+
+    def test_metadata(self):
+        metadata = Simple()
+        operation = self._make_operation(metadata=metadata)
+        operation_future = self._make_operation_future(operation)
+
+        self.assertEqual(metadata, operation_future.metadata())
+
+    def test_last_operation_data(self):
+        operation = self._make_operation()
+        operation_future = self._make_operation_future(operation)
+        self.assertEqual(operation, operation_future.last_operation_data())
+
+    def test_result_response(self):
+        response = Simple()
+        operation = self._make_operation(done=True, response=response)
+        operation_future = self._make_operation_future(operation)
+
+        self.assertEqual(response, operation_future.result())
+
+    def test_result_error(self):
+        operation = self._make_operation(done=True, error=status_pb2.Status())
+        operation_future = self._make_operation_future(operation)
+        self.assertRaises(GaxError, operation_future.result)
+
+    def test_result_timeout(self):
+        operation_future = self._make_operation_future()
+        self.assertRaises(RetryError, operation_future.result, 0)
+
+    def test_exception_error(self):
+        error = status_pb2.Status()
+        operation = self._make_operation(done=True, error=error)
+        operation_future = self._make_operation_future(operation)
+
+        self.assertEqual(error, operation_future.exception())
+
+    def test_exception_response(self):
+        operation = self._make_operation(done=True, response=Simple())
+        operation_future = self._make_operation_future(operation)
+        self.assertIsNone(operation_future.exception())
+
+    def test_exception_timeout(self):
+        operation_future = self._make_operation_future()
+        self.assertRaises(RetryError, operation_future.exception, 0)
+
+    def test_add_done_callback(self):
+        operation_future = self._make_operation_future(
+            self._make_operation(),
+            self._make_operation(done=True, response=Simple()))
+        operation_future.test_queue = mp.Manager().Queue()
+
+        operation_future.add_done_callback(_done_clbk)
+
+        self.assertTrue(operation_future.test_queue.get())
+
+    def test_add_done_callback_when_already_done(self):
+        operation_future = self._make_operation_future(
+            self._make_operation(done=True, response=Simple()))
+        operation_future.test_queue = mp.Manager().Queue()
+
+        operation_future.add_done_callback(_done_clbk)
+        self.assertTrue(operation_future.test_queue.get())
+
+        operation_future._process.join()
+        operation_future.add_done_callback(_done_clbk)
+        self.assertTrue(operation_future.test_queue.get())

@@ -37,7 +37,7 @@ import unittest2
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
     _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions)
-from google.gax.errors import GaxError, RetryError
+from google.gax.errors import GaxError
 import grpc
 
 
@@ -101,9 +101,6 @@ _RETRY_DICT = {'code_a': Exception,
 _FAKE_STATUS_CODE_1 = object()
 
 
-_FAKE_STATUS_CODE_2 = object()
-
-
 class CustomException(Exception):
     def __init__(self, msg, code):
         super(CustomException, self).__init__(msg)
@@ -155,129 +152,6 @@ class TestCreateApiCallable(unittest2.TestCase):
         my_callable = api_callable.create_api_call(mock_call, settings)
         self.assertEqual(my_callable(None), 1729)
         self.assertEqual(mock_call.call_count, to_attempt)
-
-    @mock.patch('time.time')
-    def test_no_retry_if_no_codes(self, mock_time):
-        retry = RetryOptions([], BackoffSettings(1, 2, 3, 4, 5, 6, 7))
-
-        mock_call = mock.Mock()
-        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
-        mock_time.return_value = 0
-
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(mock_call, settings)
-        self.assertRaises(CustomException, my_callable, None)
-        self.assertEqual(mock_call.call_count, 1)
-
-    @mock.patch('time.time')
-    @mock.patch('google.gax.config.exc_to_code')
-    def test_retry_aborts_simple(self, mock_exc_to_code, mock_time):
-        def fake_call(dummy_request, dummy_timeout):
-            raise CustomException('', _FAKE_STATUS_CODE_1)
-
-        retry = RetryOptions(
-            [_FAKE_STATUS_CODE_1],
-            BackoffSettings(0, 0, 0, 0, 0, 0, 1))
-        mock_time.side_effect = [0, 2]
-        mock_exc_to_code.side_effect = lambda e: e.code
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(fake_call, settings)
-
-        try:
-            my_callable(None)
-        except RetryError as exc:
-            self.assertIsInstance(exc.cause, CustomException)
-
-    @mock.patch('time.time')
-    @mock.patch('google.gax.config.exc_to_code')
-    def test_retry_times_out_simple(self, mock_exc_to_code, mock_time):
-        mock_exc_to_code.side_effect = lambda e: e.code
-        to_attempt = 3
-        retry = RetryOptions(
-            [_FAKE_STATUS_CODE_1],
-            BackoffSettings(0, 0, 0, 0, 0, 0, 1))
-        mock_call = mock.Mock()
-        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_1)
-        mock_time.side_effect = ([0] * to_attempt + [2])
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(mock_call, settings)
-
-        try:
-            my_callable(None)
-        except RetryError as exc:
-            self.assertIsInstance(exc.cause, CustomException)
-
-        self.assertEqual(mock_call.call_count, to_attempt)
-
-    @mock.patch('time.time')
-    @mock.patch('google.gax.config.exc_to_code')
-    def test_retry_aborts_on_unexpected_exception(
-            self, mock_exc_to_code, mock_time):
-        mock_exc_to_code.side_effect = lambda e: e.code
-        retry = RetryOptions(
-            [_FAKE_STATUS_CODE_1],
-            BackoffSettings(0, 0, 0, 0, 0, 0, 1))
-        mock_call = mock.Mock()
-        mock_call.side_effect = CustomException('', _FAKE_STATUS_CODE_2)
-        mock_time.return_value = 0
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(mock_call, settings)
-        self.assertRaises(Exception, my_callable, None)
-        self.assertEqual(mock_call.call_count, 1)
-
-    @mock.patch('time.time')
-    def test_retry_times_out_no_response(self, mock_time):
-        mock_time.return_value = 1
-        retry = RetryOptions(
-            [_FAKE_STATUS_CODE_1],
-            BackoffSettings(0, 0, 0, 0, 0, 0, 0))
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(lambda: None, settings)
-
-        self.assertRaises(RetryError, my_callable, None)
-
-    @mock.patch('time.sleep')
-    @mock.patch('time.time')
-    @mock.patch('google.gax.config.exc_to_code')
-    def test_retry_exponential_backoff(self, mock_exc_to_code, mock_time,
-                                       mock_sleep):
-        # pylint: disable=too-many-locals
-        mock_exc_to_code.side_effect = lambda e: e.code
-        MILLIS_PER_SEC = 1000
-        mock_time.return_value = 0
-
-        def incr_time(secs):
-            mock_time.return_value += secs
-
-        def api_call(dummy_request, timeout, **dummy_kwargs):
-            incr_time(timeout)
-            raise CustomException(str(timeout), _FAKE_STATUS_CODE_1)
-
-        mock_call = mock.Mock()
-        mock_sleep.side_effect = incr_time
-        mock_call.side_effect = api_call
-
-        params = BackoffSettings(3, 2, 24, 5, 2, 80, 2500)
-        retry = RetryOptions([_FAKE_STATUS_CODE_1], params)
-        settings = _CallSettings(timeout=0, retry=retry)
-        my_callable = api_callable.create_api_call(mock_call, settings)
-
-        try:
-            my_callable(None)
-        except RetryError as exc:
-            self.assertIsInstance(exc.cause, CustomException)
-
-        self.assertGreaterEqual(mock_time(),
-                                params.total_timeout_millis / MILLIS_PER_SEC)
-
-        # Very rough bounds
-        calls_lower_bound = params.total_timeout_millis / (
-            params.max_retry_delay_millis + params.max_rpc_timeout_millis)
-        self.assertGreater(mock_call.call_count, calls_lower_bound)
-
-        calls_upper_bound = (params.total_timeout_millis /
-                             params.initial_retry_delay_millis)
-        self.assertLess(mock_call.call_count, calls_upper_bound)
 
     def test_page_streaming(self):
         # A mock grpc function that page streams a list of consecutive

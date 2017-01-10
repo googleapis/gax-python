@@ -54,6 +54,7 @@ install_requires = [
     'ply==3.8',
     'protobuf>=3.0.0, <4.0dev',
     'oauth2client>=2.0.0, <4.0dev',
+    'googleapis-common-protos>=1.5.0, <2.0dev',
 ]
 
 setup(
@@ -82,4 +83,5 @@ setup(
     ],
     tests_require=['pytest'],
     install_requires=install_requires,
+    include_package_data=True,
 )

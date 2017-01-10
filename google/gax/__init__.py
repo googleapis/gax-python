@@ -31,9 +31,23 @@
 
 from __future__ import absolute_import
 import collections
+import logging
+import multiprocessing as mp
+
+from grpc import RpcError, StatusCode
+from google.rpc import code_pb2
+
+from google.gax.errors import GaxError
+from google.gax.retry import retryable
 
 
 __version__ = '0.15.0'
+
+
+_LOG = logging.getLogger(__name__)
+
+
+_MILLIS_PER_SEC = 1000
 
 
 INITIAL_PAGE = object()
@@ -482,3 +496,180 @@ class ResourceIterator(object):
         if self._index >= len(self._current):
             self._current = None
         return resource
+
+
+def _from_any(pb_type, any_pb):
+    """Converts an Any protobuf to the specified message type
+
+    Args:
+        pb_type (type): the type of the message that any_pb stores an instance
+            of.
+        any_pb (google.protobuf.any_pb2.Any): the object to be converted.
+
+    Returns:
+        An instance of the pb_type message.
+    """
+    msg = pb_type()
+    if any_pb.Unpack(msg):
+        return msg
+
+    raise TypeError(
+        'Could not convert {} to {}'.format(
+            any_pb.__class__.__name__, pb_type.__name__))
+
+
+def _try_callback(target, clbk):
+    try:
+        clbk(target)
+    except Exception as ex:  # pylint: disable=broad-except
+        _LOG.exception(ex)
+
+
+class _DeadlineExceededError(RpcError, GaxError):
+
+    def __init__(self):
+        super(_DeadlineExceededError, self).__init__('Deadline Exceeded')
+
+    def code(self):  # pylint: disable=no-self-use
+        """Always returns StatusCode.DEADLINE_EXCEEDED"""
+        return StatusCode.DEADLINE_EXCEEDED
+
+
+class _OperationFuture(object):
+    """A Future which polls a service for completion via OperationsClient."""
+
+    def __init__(self, operation, client, result_type, metadata_type,
+                 call_options=None):
+        """Constructor.
+
+        Args:
+            operation (google.longrunning.Operation): the initial long-running
+                operation object.
+            client (google.gapic.longrunning.operations_client.OperationsClient):
+                a client for the long-running operation service.
+            result_type (type): the class type of the result.
+            metadata_type (type, optional): the class type of the metadata.
+            call_options (google.gax.CallOptions, optional): the call options
+                that are used when reloading the operation.
+        """
+        self._operation = operation
+        self._client = client
+        self._result_type = result_type
+        self._metadata_type = metadata_type
+        self._call_options = call_options
+        self._done_clbks = collections.deque()
+        self._process = None
+
+    def cancel(self):
+        """If last Operation's value of `done` is true, returns false;
+        otherwise, issues OperationsClient.cancel_operation and returns true.
+        """
+        if self.done():
+            return False
+
+        self._client.cancel_operation(self._operation.name)
+        return True
+
+    def result(self, timeout=None):
+        """Enters polling loop on OperationsClient.get_operation, and once
+        Operation.done is true, then returns Operation.response if successful or
+        throws GaxError if not successful.
+
+        This method will wait up to timeout seconds. If the call hasn't
+        completed in timeout seconds, then a RetryError will be raised. timeout
+        can be an int or float. If timeout is not specified or None, there is no
+        limit to the wait time.
+        """
+        if not self._poll(timeout).HasField('response'):
+            raise GaxError(self._operation.error.message)
+
+        return _from_any(self._result_type, self._operation.response)
+
+    def exception(self, timeout=None):
+        """Similar to result(), except returns the exception if any."""
+        if self._poll(timeout).HasField('error'):
+            return self._operation.error
+
+        return None
+
+    def cancelled(self):
+        """Return True if the call was successfully cancelled."""
+        self._get_operation()
+        return (self._operation.HasField('error') and
+                self._operation.error.code == code_pb2.CANCELLED)
+
+    def done(self):
+        """Issues OperationsClient.get_operation and returns value of
+        Operation.done.
+        """
+        return self._get_operation().done
+
+    def add_done_callback(self, fn):  # pylint: disable=invalid-name
+        """Enters a polling loop on OperationsClient.get_operation, and once the
+        operation is done or cancelled, calls the function with this
+        _OperationFuture. Added callables are called in the order that they were
+        added.
+        """
+        if self._process is None:
+            self._done_clbks.append(fn)
+            self._process = mp.Process(target=self._execute_clbks)
+            self._process.start()
+        elif not self._process.is_alive() and self._operation.done:
+            _try_callback(self, fn)
+        else:
+            self._done_clbks.append(fn)
+
+    def operation_name(self):
+        """Returns the value of Operation.name."""
+        return self._operation.name
+
+    def metadata(self):
+        """Returns the value of Operation.metadata from the last call to
+        OperationsClient.get_operation (or if only the initial API call has been
+        made, the metadata from that first call).
+        """
+        if self._operation.metadata is None:
+            return None
+
+        return _from_any(self._metadata_type, self._operation.metadata)
+
+    def last_operation_data(self):
+        """Returns the data from the last call to OperationsClient.get_operation
+        (or if only the initial API call has been made, the data from that first
+        call).
+        """
+        return self._operation
+
+    def _get_operation(self):
+        if not self._operation.done:
+            self._operation = self._client.get_operation(
+                self._operation.name, self._call_options)
+
+        return self._operation
+
+    def _poll(self, timeout=None):
+        def _done_check(_):
+            if self.done():
+                return self._operation
+
+            raise _DeadlineExceededError()
+
+        if timeout is None:
+            backoff_settings = BackoffSettings(
+                1000, 2, 30000, None, None, None, None)
+        else:
+            backoff_settings = BackoffSettings(
+                1000, 2, 30000, 0, 0, 0, timeout * _MILLIS_PER_SEC)
+
+        retry_options = RetryOptions(
+            [StatusCode.DEADLINE_EXCEEDED], backoff_settings)
+        retryable_done_check = retryable(_done_check, retry_options)
+
+        return retryable_done_check()
+
+    def _execute_clbks(self):
+        self._poll()
+
+        while self._done_clbks:
+            done_clbk = self._done_clbks.popleft()
+            _try_callback(self, done_clbk)
