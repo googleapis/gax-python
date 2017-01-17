@@ -41,7 +41,7 @@ from google.gax.errors import GaxError
 from google.gax.retry import retryable
 
 
-__version__ = '0.15.0'
+__version__ = '0.15.1'
 
 
 _LOG = logging.getLogger(__name__)
