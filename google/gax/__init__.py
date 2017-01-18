@@ -45,6 +45,7 @@ __version__ = '0.15.1'
 
 
 _LOG = logging.getLogger(__name__)
+_LOG.addHandler(logging.NullHandler())
 
 
 _MILLIS_PER_SEC = 1000
