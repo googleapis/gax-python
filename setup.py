@@ -49,12 +49,13 @@ with open('google/gax/__init__.py', 'r') as f:
         raise RuntimeError("No version number found!")
 
 install_requires = [
+    'dill>=0.2.5, <0.3dev',
     'future>=0.16.0, <0.17dev',
+    'googleapis-common-protos>=1.5.0, <2.0dev',
     'grpcio>=1.0.0, <2.0dev',
+    'oauth2client>=2.0.0, <4.0dev',
     'ply==3.8',
     'protobuf>=3.0.0, <4.0dev',
-    'oauth2client>=2.0.0, <4.0dev',
-    'googleapis-common-protos>=1.5.0, <2.0dev',
 ]
 
 setup(

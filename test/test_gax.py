@@ -27,10 +27,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name,protected-access
+# pylint: disable=missing-docstring,no-self-use,no-init,invalid-name,protected-access,too-many-public-methods
 """Unit tests for gax package globals."""
 
 from __future__ import absolute_import
+import logging
 import multiprocessing as mp
 import mock
 import unittest2
@@ -40,7 +41,7 @@ from google.longrunning import operations_pb2
 from google.rpc import code_pb2, status_pb2
 from google.gax import (
     BundleOptions, CallOptions, _CallSettings, INITIAL_PAGE, OPTION_INHERIT,
-    RetryOptions, _OperationFuture)
+    RetryOptions, _OperationFuture, _LOG)
 from google.gax.errors import GaxError, RetryError
 
 
@@ -118,24 +119,56 @@ class TestCallSettings(unittest2.TestCase):
         self.assertEqual(final.bundle_descriptor, settings.bundle_descriptor)
 
 
-def _done_clbk(operation_future):
-    operation_future.test_queue.put(True)
+def _task1(operation_future):
+    operation_future.test_queue.put(operation_future.result().field1)
+
+
+def _task2(operation_future):
+    operation_future.test_queue.put(operation_future.result().field2)
 
 
 class _FakeOperationsClient(object):
     def __init__(self, operations):
         self.operations = list(reversed(operations))
 
-    def get_operation(self, *args):  # pylint: disable=unused-argument
+    def get_operation(self, *_):
         return self.operations.pop()
 
-    def cancel_operation(self, *args):  # pylint: disable=unused-argument
+    def cancel_operation(self, *_):
         pass
+
+
+class _FakeLoggingHandler(logging.Handler):
+    def __init__(self, *args, **kwargs):
+        self.queue = mp.Queue()
+        super(_FakeLoggingHandler, self).__init__(*args, **kwargs)
+
+    def emit(self, record):
+        self.acquire()
+        try:
+            self.queue.put(record.getMessage())
+        finally:
+            self.release()
+
+    def reset(self):
+        self.acquire()
+        try:
+            self.queue = mp.Queue()
+        finally:
+            self.release()
 
 
 class TestOperationFuture(unittest2.TestCase):
 
     OPERATION_NAME = 'operations/projects/foo/instances/bar/operations/123'
+
+    @classmethod
+    def setUpClass(cls):
+        cls._log_handler = _FakeLoggingHandler(level='DEBUG')
+        _LOG.addHandler(cls._log_handler)
+
+    def setUp(self):
+        self._log_handler.reset()
 
     def _make_operation(self, metadata=None, response=None, error=None,
                         **kwargs):
@@ -215,6 +248,10 @@ class TestOperationFuture(unittest2.TestCase):
 
         self.assertEqual(metadata, operation_future.metadata())
 
+    def test_metadata_none(self):
+        operation_future = self._make_operation_future()
+        self.assertIsNone(operation_future.metadata())
+
     def test_last_operation_data(self):
         operation = self._make_operation()
         operation_future = self._make_operation_future(operation)
@@ -253,23 +290,34 @@ class TestOperationFuture(unittest2.TestCase):
         self.assertRaises(RetryError, operation_future.exception, 0)
 
     def test_add_done_callback(self):
+        response = Simple(field1='foo', field2='bar')
+        operation_future = self._make_operation_future(
+            self._make_operation(),
+            self._make_operation(done=True, response=response))
+        operation_future.test_queue = mp.Queue()
+
+        operation_future.add_done_callback(_task1)
+        operation_future.add_done_callback(_task2)
+
+        self.assertEqual('foo', operation_future.test_queue.get())
+        self.assertEqual('bar', operation_future.test_queue.get())
+
+    def test_add_done_callback_when_already_done(self):
+        response = Simple(field1='foo', field2='bar')
+        operation_future = self._make_operation_future(
+            self._make_operation(done=True, response=response))
+        operation_future.test_queue = mp.Queue()
+
+        operation_future.add_done_callback(_task1)
+
+        self.assertEqual('foo', operation_future.test_queue.get())
+
+    def test_add_done_callback_when_exception(self):
+        def _raising_task(_):
+            raise Exception('Test message')
+
         operation_future = self._make_operation_future(
             self._make_operation(),
             self._make_operation(done=True, response=Simple()))
-        operation_future.test_queue = mp.Manager().Queue()
-
-        operation_future.add_done_callback(_done_clbk)
-
-        self.assertTrue(operation_future.test_queue.get())
-
-    def test_add_done_callback_when_already_done(self):
-        operation_future = self._make_operation_future(
-            self._make_operation(done=True, response=Simple()))
-        operation_future.test_queue = mp.Manager().Queue()
-
-        operation_future.add_done_callback(_done_clbk)
-        self.assertTrue(operation_future.test_queue.get())
-
-        operation_future._process.join()
-        operation_future.add_done_callback(_done_clbk)
-        self.assertTrue(operation_future.test_queue.get())
+        operation_future.add_done_callback(_raising_task)
+        self.assertEqual('Test message', self._log_handler.queue.get())

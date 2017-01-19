@@ -34,6 +34,8 @@ import collections
 import logging
 import multiprocessing as mp
 
+import dill
+
 from grpc import RpcError, StatusCode
 from google.rpc import code_pb2
 
@@ -511,12 +513,14 @@ def _from_any(pb_type, any_pb):
         An instance of the pb_type message.
     """
     msg = pb_type()
-    if any_pb.Unpack(msg):
-        return msg
+    # Check exceptional case: raise if can't Unpack
+    if not any_pb.Unpack(msg):
+        raise TypeError(
+            'Could not convert {} to {}'.format(
+                any_pb.__class__.__name__, pb_type.__name__))
 
-    raise TypeError(
-        'Could not convert {} to {}'.format(
-            any_pb.__class__.__name__, pb_type.__name__))
+    # Return expected message
+    return msg
 
 
 def _try_callback(target, clbk):
@@ -558,7 +562,7 @@ class _OperationFuture(object):
         self._result_type = result_type
         self._metadata_type = metadata_type
         self._call_options = call_options
-        self._done_clbks = collections.deque()
+        self._queue = mp.Queue()
         self._process = None
 
     def cancel(self):
@@ -581,17 +585,21 @@ class _OperationFuture(object):
         can be an int or float. If timeout is not specified or None, there is no
         limit to the wait time.
         """
+        # Check exceptional case: raise if no response
         if not self._poll(timeout).HasField('response'):
             raise GaxError(self._operation.error.message)
 
+        # Return expected result
         return _from_any(self._result_type, self._operation.response)
 
     def exception(self, timeout=None):
         """Similar to result(), except returns the exception if any."""
-        if self._poll(timeout).HasField('error'):
-            return self._operation.error
+        # Check exceptional case: return none if no error
+        if not self._poll(timeout).HasField('error'):
+            return None
 
-        return None
+        # Return expected error
+        return self._operation.error
 
     def cancelled(self):
         """Return True if the call was successfully cancelled."""
@@ -611,14 +619,13 @@ class _OperationFuture(object):
         _OperationFuture. Added callables are called in the order that they were
         added.
         """
-        if self._process is None:
-            self._done_clbks.append(fn)
-            self._process = mp.Process(target=self._execute_clbks)
-            self._process.start()
-        elif not self._process.is_alive() and self._operation.done:
+        if self._operation.done:
             _try_callback(self, fn)
         else:
-            self._done_clbks.append(fn)
+            self._queue.put(dill.dumps(fn))
+            if self._process is None:
+                self._process = mp.Process(target=self._execute_tasks)
+                self._process.start()
 
     def operation_name(self):
         """Returns the value of Operation.name."""
@@ -629,9 +636,11 @@ class _OperationFuture(object):
         OperationsClient.get_operation (or if only the initial API call has been
         made, the metadata from that first call).
         """
-        if self._operation.metadata is None:
+        # Check exceptional case: return none if no metadata
+        if not self._operation.HasField('metadata'):
             return None
 
+        # Return expected metadata
         return _from_any(self._metadata_type, self._operation.metadata)
 
     def last_operation_data(self):
@@ -650,10 +659,12 @@ class _OperationFuture(object):
 
     def _poll(self, timeout=None):
         def _done_check(_):
-            if self.done():
-                return self._operation
+            # Check exceptional case: raise if in progress
+            if not self.done():
+                raise _DeadlineExceededError()
 
-            raise _DeadlineExceededError()
+            # Return expected operation
+            return self._operation
 
         if timeout is None:
             backoff_settings = BackoffSettings(
@@ -668,9 +679,9 @@ class _OperationFuture(object):
 
         return retryable_done_check()
 
-    def _execute_clbks(self):
+    def _execute_tasks(self):
         self._poll()
 
-        while self._done_clbks:
-            done_clbk = self._done_clbks.popleft()
-            _try_callback(self, done_clbk)
+        while not self._queue.empty():
+            task = dill.loads(self._queue.get())
+            _try_callback(self, task)
