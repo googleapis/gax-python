@@ -33,6 +33,7 @@ from __future__ import absolute_import
 import collections
 import logging
 import multiprocessing as mp
+import os
 
 import dill
 
@@ -43,14 +44,14 @@ from google.gax.errors import GaxError
 from google.gax.retry import retryable
 
 
-__version__ = '0.15.1'
+CUR_DIR = os.path.realpath(
+    os.path.dirname(__file__) + os.path.sep + os.path.join('..', '..'))
+with open('%s%sVERSION' % (CUR_DIR, os.path.sep), 'r') as version_file:
+    __version__ = version_file.read().strip()
 
 
 _LOG = logging.getLogger(__name__)
 _LOG.addHandler(logging.NullHandler())
-
-
-_MILLIS_PER_SEC = 1000
 
 
 INITIAL_PAGE = object()
@@ -666,17 +667,37 @@ class _OperationFuture(object):
             # Return expected operation
             return self._operation
 
-        if timeout is None:
-            backoff_settings = BackoffSettings(
-                1000, 2, 30000, None, None, None, None)
-        else:
-            backoff_settings = BackoffSettings(
-                1000, 2, 30000, 0, 0, 0, timeout * _MILLIS_PER_SEC)
+        # If a timeout is set, then convert it to milliseconds.
+        #
+        # Also, we need to send 0 instead of None for the rpc arguments,
+        # because an internal method (`_has_timeout_settings`) will
+        # erroneously return False otherwise.
+        # TODO (lukesneeringer): Look into this.
+        rpc_arg = None
+        if timeout is not None:
+            timeout *= 1000
+            rpc_arg = 0
 
+        # Set the backoff settings. We have specific backoff settings
+        # for "are we there yet" calls that are distinct from those configured
+        # in the config.json files.
+        backoff_settings = BackoffSettings(
+            initial_retry_delay_millis=1000,
+            retry_delay_multiplier=2,
+            max_retry_delay_millis=30000,
+            initial_rpc_timeout_millis=rpc_arg,
+            rpc_timeout_multiplier=rpc_arg,
+            max_rpc_timeout_millis=rpc_arg,
+            total_timeout_millis=timeout,
+        )
+
+        # Set the retry to retry if `_done_check` raises the
+        # _DeadlineExceededError, according to the given backoff settings.
         retry_options = RetryOptions(
             [StatusCode.DEADLINE_EXCEEDED], backoff_settings)
         retryable_done_check = retryable(_done_check, retry_options)
 
+        # Start polling, and return the final result from `_done_check`.
         return retryable_done_check()
 
     def _execute_tasks(self):
