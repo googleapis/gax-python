@@ -1,2 +1,4 @@
-include README.rst LICENSE
+include LICENSE
+include README.rst
+include google/gax/VERSION
 global-include *.json
