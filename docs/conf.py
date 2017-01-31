@@ -51,8 +51,7 @@ import shlex
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 
-with open(os.path.join('..', 'VERSION'), 'r') as version_file:
-    __version__ = version_file.read().strip()
+from google.gax import __version__
 
 # -- General configuration ------------------------------------------------
 

@@ -1,2 +1,2 @@
-include README.rst LICENSE VERSION
+include README.rst LICENSE
 global-include *.json

@@ -39,8 +39,14 @@ if sys.argv[-1] == 'publish':
     sys.exit()
 
 # Get the version
-with open('VERSION', 'r') as f:
-    version = f.read().strip()
+version_regex = r'__version__ = ["\']([^"\']*)["\']'
+with open('google/gax/__init__.py', 'r') as f:
+    text = f.read()
+    match = re.search(version_regex, text)
+    if match:
+        version = match.group(1)
+    else:
+        raise RuntimeError("No version number found!")
 
 install_requires = [
     'dill>=0.2.5, <0.3dev',

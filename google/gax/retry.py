@@ -83,7 +83,8 @@ def retryable(a_func, retry_options, **kwargs):
       A function that will retry on exception.
     """
     delay_mult = retry_options.backoff_settings.retry_delay_multiplier
-    max_delay_millis = retry_options.backoff_settings.max_retry_delay_millis
+    max_delay = (retry_options.backoff_settings.max_retry_delay_millis /
+                 _MILLIS_PER_SECOND)
     has_timeout_settings = _has_timeout_settings(retry_options.backoff_settings)
 
     if has_timeout_settings:
@@ -128,13 +129,9 @@ def retryable(a_func, retry_options, **kwargs):
                 exc = errors.RetryError(
                     'Retry total timeout exceeded with exception', exception)
 
-                # Sleep a random number which will, on average, equal half of
-                # the given delay.
-                # TODO (lukesneeringer): This is probably unexpected behavior,
-                # but we do it in every language. Perhaps we should change it.
                 to_sleep = random.uniform(0, delay)
                 time.sleep(to_sleep / _MILLIS_PER_SECOND)
-                delay = min(delay * delay_mult, max_delay_millis)
+                delay = min(delay * delay_mult, max_delay)
 
                 if has_timeout_settings:
                     now = time.time()
