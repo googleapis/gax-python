@@ -42,17 +42,17 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import pkg_resources
 import shlex
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('..'))
 
-with open(os.path.join('..', 'google', 'gax', 'VERSION'), 'r') as version_file:
-    __version__ = version_file.read().strip()
+__version__ = pkg_resources.get_distribution('google-gax').version
 
 # -- General configuration ------------------------------------------------
 

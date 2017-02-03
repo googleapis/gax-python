@@ -33,7 +33,7 @@ from __future__ import absolute_import
 import collections
 import logging
 import multiprocessing as mp
-import os
+import pkg_resources
 
 import dill
 
@@ -44,9 +44,9 @@ from google.gax.errors import GaxError
 from google.gax.retry import retryable
 
 
-CUR_DIR = os.path.realpath(os.path.dirname(__file__))
-with open('%s%sVERSION' % (CUR_DIR, os.path.sep), 'r') as version_file:
-    __version__ = version_file.read().strip()
+# pylint: disable=no-member
+__version__ = pkg_resources.get_distribution('google-gax').version
+# pylint: enable=no-member
 
 
 _LOG = logging.getLogger(__name__)

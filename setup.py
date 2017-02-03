@@ -38,10 +38,6 @@ if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit()
 
-# Get the version
-with open(os.path.join('google', 'gax', 'VERSION'), 'r') as f:
-    version = f.read().strip()
-
 install_requires = [
     'dill>=0.2.5, <0.3dev',
     'future>=0.16.0, <0.17dev',
@@ -54,7 +50,7 @@ install_requires = [
 
 setup(
     name='google-gax',
-    version=version,
+    version='0.15.5',
     description='Google API Extensions',
     long_description=open('README.rst').read(),
     author='Google API Authors',
