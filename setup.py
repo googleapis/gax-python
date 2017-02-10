@@ -41,23 +41,26 @@ if sys.argv[-1] == 'publish':
 install_requires = [
     'dill>=0.2.5, <0.3dev',
     'future>=0.16.0, <0.17dev',
-    'googleapis-common-protos>=1.5.0, <2.0dev',
+    'googleapis-common-protos>=1.5.2, <2.0dev',
     'grpcio>=1.0.0, <2.0dev',
     'oauth2client>=2.0.0, <4.0dev',
     'ply==3.8',
     'protobuf>=3.0.0, <4.0dev',
 ]
 
+with open('README.rst', 'r') as readme:
+    long_description = readme.read()
+
 setup(
     name='google-gax',
     version='0.15.5',
     description='Google API Extensions',
-    long_description=open('README.rst').read(),
+    long_description=long_description,
     author='Google API Authors',
     author_email='googleapis-packages@google.com',
     url='https://github.com/googleapis/gax-python',
-    namespace_packages = ['google'],
-    packages=find_packages(),
+    namespace_packages=('google',),
+    packages=find_packages(exclude=('test',)),
     package_dir={'google-gax': 'google'},
     license='BSD-3-Clause',
     classifiers=[

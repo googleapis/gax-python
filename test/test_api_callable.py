@@ -31,15 +31,23 @@
 """Unit tests for api_callable"""
 
 from __future__ import absolute_import, division
+import collections
+import platform
+
 import mock
+import pkg_resources
 import unittest2
 
 from google.gax import (
     api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
-    _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions)
+    _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions,
+    __version__ as GAX_VERSION)
 from google.gax.errors import GaxError
 import grpc
 
+# pylint: disable=no-member
+GRPC_VERSION = pkg_resources.get_distribution('grpcio').version
+# pylint: enable=no-member
 
 _SERVICE_NAME = 'test.interface.v1.api'
 
@@ -253,20 +261,68 @@ class TestCreateApiCallable(unittest2.TestCase):
             bundle_descriptors=_BUNDLE_DESCRIPTORS,
             page_descriptors=_PAGE_DESCRIPTORS,
             kwargs={'key1': 'value1'})
+
+        # Check values of the bundling method settings.
         settings = defaults['bundling_method']
         self.assertAlmostEqual(settings.timeout, 25.0)
         self.assertIsInstance(settings.bundler, bundling.Executor)
         self.assertIsInstance(settings.bundle_descriptor, BundleDescriptor)
         self.assertIsNone(settings.page_descriptor)
-        self.assertIsInstance(settings.retry, RetryOptions)
-        self.assertEqual(settings.kwargs, {'key1': 'value1'})
+
+        # Check values of the page streaming method settings.
         settings = defaults['page_streaming_method']
         self.assertAlmostEqual(settings.timeout, 12.0)
         self.assertIsNone(settings.bundler)
         self.assertIsNone(settings.bundle_descriptor)
         self.assertIsInstance(settings.page_descriptor, PageDescriptor)
-        self.assertIsInstance(settings.retry, RetryOptions)
-        self.assertEqual(settings.kwargs, {'key1': 'value1'})
+
+        # Check values that should be the same in both method settings.
+        for settings in defaults.values():
+            self.assertIsInstance(settings.retry, RetryOptions)
+            self.assertEqual(settings.kwargs['key1'], 'value1')
+            self.assertIn('metadata', settings.kwargs)
+            metadata = settings.kwargs['metadata'][0][1]
+            self.assertIn('gl-python/%s' % platform.python_version(), metadata)
+            self.assertIn('gax/%s' % GAX_VERSION, metadata)
+            self.assertIn('grpc/%s' % GRPC_VERSION, metadata)
+
+    def test_construct_with_explicit_metadata(self):
+        defaults = api_callable.construct_settings(
+            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT,
+            bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            page_descriptors=_PAGE_DESCRIPTORS,
+            kwargs={'metadata': [('x-goog-api-client', 'foo/1.2.3')]})
+        settings = defaults['bundling_method']
+        metadata = settings.kwargs['metadata'][0][1]
+
+        # Ensure that the metadata string contains items that GAX adds,
+        # but not the original header.
+        self.assertNotIn('foo/1.2.3', metadata)
+        self.assertIn('gl-python/%s' % platform.python_version(), metadata)
+        self.assertIn('gax/%s' % GAX_VERSION, metadata)
+        self.assertIn('grpc/%s' % GRPC_VERSION, metadata)
+
+    def test_construct_with_ab(self):
+        defaults = api_callable.construct_settings(
+            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT,
+            bundle_descriptors=_BUNDLE_DESCRIPTORS,
+            page_descriptors=_PAGE_DESCRIPTORS,
+            metrics_headers=collections.OrderedDict(
+                (('gl-abkey1', 'foo'), ('gl-abvalue1', 'bar')),
+            ))
+        settings = defaults['bundling_method']
+        metadata = settings.kwargs['metadata'][0][1]
+
+        # Establish that the appropriate strings are all part of the
+        # header, including the A/B key and value.
+        self.assertIn('gl-python/%s' % platform.python_version(), metadata)
+        self.assertIn('gax/%s' % GAX_VERSION, metadata)
+        self.assertIn('grpc/%s' % GRPC_VERSION, metadata)
+        self.assertIn('gl-abkey1/foo', metadata)
+        self.assertIn('gl-abvalue1/bar', metadata)
+
+        # Establish that the A/B key/value was shifted to the end.
+        self.assertTrue(metadata.endswith('gl-abkey1/foo gl-abvalue1/bar'))
 
     def test_construct_settings_override(self):
         _override = {

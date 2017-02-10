@@ -29,13 +29,15 @@
 
 """Provides function wrappers that implement page streaming and retrying."""
 
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, unicode_literals
+import collections
+import platform
+
+import pkg_resources
 
 from future import utils
 
-from google.gax import (BackoffSettings, BundleOptions, bundling, _CallSettings,
-                        config, errors, PageIterator, ResourceIterator,
-                        RetryOptions, retry)
+from google import gax
 
 _MILLIS_PER_SECOND = 1000
 
@@ -66,7 +68,7 @@ def _bundleable(desc):
         if not settings.bundler:
             return a_func(request, **kwargs)
 
-        the_id = bundling.compute_bundle_id(
+        the_id = gax.bundling.compute_bundle_id(
             request, desc.request_discriminator_fields)
         return settings.bundler.schedule(a_func, the_id, desc, request, kwargs)
 
@@ -85,10 +87,10 @@ def _page_streamable(page_descriptor):
 
     def inner(a_func, settings, request, **kwargs):
         """Actual page-streaming based on the settings."""
-        page_iterator = PageIterator(
+        page_iterator = gax.PageIterator(
             a_func, page_descriptor, settings.page_token, request, **kwargs)
         if settings.flatten_pages:
-            return ResourceIterator(page_iterator)
+            return gax.ResourceIterator(page_iterator)
         else:
             return page_iterator
 
@@ -110,7 +112,7 @@ def _construct_bundling(bundle_config, bundle_descriptor):
       The bundling.Executor may be None if this method should not bundle.
     """
     if bundle_config and bundle_descriptor:
-        bundler = bundling.Executor(BundleOptions(
+        bundler = gax.bundling.Executor(gax.BundleOptions(
             element_count_threshold=bundle_config.get(
                 'element_count_threshold', 0),
             element_count_limit=bundle_config.get('element_count_limit', 0),
@@ -158,9 +160,12 @@ def _construct_retry(method_config, retry_codes, retry_params, retry_names):
     if retry_params and 'retry_params_name' in method_config:
         params_name = method_config['retry_params_name']
         if params_name and params_name in retry_params:
-            backoff_settings = BackoffSettings(**retry_params[params_name])
+            backoff_settings = gax.BackoffSettings(**retry_params[params_name])
 
-    return RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
+    return gax.RetryOptions(
+        backoff_settings=backoff_settings,
+        retry_codes=codes,
+    )
 
 
 def _merge_retry_options(retry_options, overrides):
@@ -190,7 +195,10 @@ def _merge_retry_options(retry_options, overrides):
     if overrides.backoff_settings is not None:
         backoff_settings = overrides.backoff_settings
 
-    return RetryOptions(retry_codes=codes, backoff_settings=backoff_settings)
+    return gax.RetryOptions(
+        backoff_settings=backoff_settings,
+        retry_codes=codes,
+    )
 
 
 def _upper_camel_to_lower_under(string):
@@ -209,7 +217,7 @@ def _upper_camel_to_lower_under(string):
 def construct_settings(
         service_name, client_config, config_override,
         retry_names, bundle_descriptors=None, page_descriptors=None,
-        kwargs=None):
+        metrics_headers=(), kwargs=None):
     """Constructs a dictionary mapping method names to _CallSettings.
 
     The ``client_config`` parameter is parsed from a client configuration JSON
@@ -272,6 +280,9 @@ def construct_settings(
         default config and config_override will be specified by users.
       retry_names: A dictionary mapping the strings referring to response status
         codes to the Python objects representing those codes.
+      metrics_headers: Dictionary of headers to be passed for analytics.
+        Sent as a dictionary; eventually becomes a space-separated string
+        (e.g. 'foo/1.0.0 bar/3.14.1').
       kwargs: The keyword arguments to be passed to the API calls.
 
     Raises:
@@ -279,10 +290,50 @@ def construct_settings(
         located in the provided ``client_config``.
     """
     # pylint: disable=too-many-locals
+    # pylint: disable=protected-access
     defaults = {}
     bundle_descriptors = bundle_descriptors or {}
+    metrics_headers = collections.OrderedDict(metrics_headers)
     page_descriptors = page_descriptors or {}
     kwargs = kwargs or {}
+
+    # Add the language header to metrics.
+    metrics_headers['gl-python'] = platform.python_version()
+
+    # Sanity check: It is possible that we got this far but some headers
+    # were specified with an older library, which sends them as...
+    #   kwargs={'metadata': [('x-goog-api-client', 'foo/1.0 bar/3.0')]}
+    #
+    # Note: This is the final format we will send down to GRPC shortly.
+    #
+    # Remove any x-goog-api-client header that may have been present
+    # in the metadata list.
+    if 'metadata' in kwargs:
+        kwargs['metadata'] = [value for value in kwargs['metadata']
+                              if value[0].lower() != 'x-goog-api-client']
+
+    # Add the GAX and GRPC headers to our metrics.
+    # pylint: disable=no-member
+    grpc_version = pkg_resources.get_distribution('grpcio').version
+    # pylint: enable=no-member
+    metrics_headers['gax'] = gax.__version__
+    metrics_headers['grpc'] = grpc_version
+
+    # A/B key-value pairs belong at the end of the metadata string;
+    # shift any that appear to the end of the dictionary.
+    ab_keys = [k for k in metrics_headers.keys() if k.startswith('gl-ab')]
+    for key in ab_keys:
+        value = metrics_headers.pop(key)
+        metrics_headers[key] = value
+
+    # Okay, now add our new and complete metadata into the old
+    # kwargs format:
+    #   kwargs={'metadata': [('x-goog-api-client', 'gax/x.y.z grpc/x.y.z')]}
+    #
+    # This is how it will be sent to the underlying GRPC layer.
+    header = ' '.join(['%s/%s' % (k, v) for k, v in metrics_headers.items()])
+    kwargs.setdefault('metadata', [])
+    kwargs['metadata'].append(('x-goog-api-client', header))
 
     try:
         service_config = client_config['interfaces'][service_name]
@@ -315,7 +366,7 @@ def construct_settings(
             _construct_retry(overriding_method, overrides.get('retry_codes'),
                              overrides.get('retry_params'), retry_names))
 
-        defaults[snake_name] = _CallSettings(
+        defaults[snake_name] = gax._CallSettings(
             timeout=timeout, retry=retry_options,
             page_descriptor=page_descriptors.get(snake_name),
             bundler=bundler, bundle_descriptor=bundle_descriptor,
@@ -340,7 +391,7 @@ def _catch_errors(a_func, to_catch):
         # pylint: disable=catching-non-exception
         except tuple(to_catch) as exception:
             utils.raise_with_traceback(
-                errors.create_error('RPC failed', cause=exception))
+                gax.errors.create_error('RPC failed', cause=exception))
 
     return inner
 
@@ -381,12 +432,12 @@ def create_api_call(func, settings):
         """Invoke with the actual settings."""
         this_settings = settings.merge(options)
         if this_settings.retry and this_settings.retry.retry_codes:
-            api_call = retry.retryable(
+            api_call = gax.retry.retryable(
                 func, this_settings.retry, **this_settings.kwargs)
         else:
-            api_call = retry.add_timeout_arg(
+            api_call = gax.retry.add_timeout_arg(
                 func, this_settings.timeout, **this_settings.kwargs)
-        api_call = _catch_errors(api_call, config.API_ERRORS)
+        api_call = _catch_errors(api_call, gax.config.API_ERRORS)
         return api_caller(api_call, this_settings, request)
 
     if settings.page_descriptor:
