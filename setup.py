@@ -53,7 +53,7 @@ with open('README.rst', 'r') as readme:
 
 setup(
     name='google-gax',
-    version='0.15.5',
+    version='0.15.6',
     description='Google API Extensions',
     long_description=long_description,
     author='Google API Authors',

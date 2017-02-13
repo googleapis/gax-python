@@ -38,6 +38,7 @@ import pkg_resources
 from future import utils
 
 from google import gax
+from google.gax import bundling
 
 _MILLIS_PER_SECOND = 1000
 
@@ -68,7 +69,7 @@ def _bundleable(desc):
         if not settings.bundler:
             return a_func(request, **kwargs)
 
-        the_id = gax.bundling.compute_bundle_id(
+        the_id = bundling.compute_bundle_id(
             request, desc.request_discriminator_fields)
         return settings.bundler.schedule(a_func, the_id, desc, request, kwargs)
 
@@ -112,7 +113,7 @@ def _construct_bundling(bundle_config, bundle_descriptor):
       The bundling.Executor may be None if this method should not bundle.
     """
     if bundle_config and bundle_descriptor:
-        bundler = gax.bundling.Executor(gax.BundleOptions(
+        bundler = bundling.Executor(gax.BundleOptions(
             element_count_threshold=bundle_config.get(
                 'element_count_threshold', 0),
             element_count_limit=bundle_config.get('element_count_limit', 0),
