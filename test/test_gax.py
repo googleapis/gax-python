@@ -36,7 +36,7 @@ import multiprocessing as mp
 import mock
 import unittest2
 
-from fixture_pb2 import Simple
+from test.fixtures.fixture_pb2 import Simple
 from google.longrunning import operations_pb2
 from google.rpc import code_pb2, status_pb2
 from google.gax import (

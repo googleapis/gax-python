@@ -37,7 +37,7 @@ import unittest2
 
 from google.gax import bundling, BundleOptions, BundleDescriptor
 
-from fixture_pb2 import Simple, Outer, Bundled
+from test.fixtures.fixture_pb2 import Simple, Outer, Bundled
 
 
 def _Simple(value, other_value=None):
