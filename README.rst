@@ -38,10 +38,9 @@ Contributing
 
 Contributions to this library are always welcome and highly encouraged.
 
-See the `CONTRIBUTING`_ documentation for more information on how to get started.
+See `CONTRIBUTING.rst`_ for more information on how to get started.
 
-.. _`CONTRIBUTING`: https://github.com/googleapis/gax-python/blob/master/CONTRIBUTING.rst
-
+.. _CONTRIBUTING.rst: https://github.com/googleapi/gax-python/blob/master/CONTRIBUTING.rst
 
 Versioning
 ----------
@@ -66,6 +65,6 @@ For detailed documentation of the modules in gax-python, please watch `DOCUMENTA
 License
 -------
 
-BSD - See `LICENSE`_ for more information.
+BSD - See `the LICENSE`_ for more information.
 
-.. _`LICENSE`: https://github.com/googleapis/gax-python/blob/master/LICENSE
+.. _`the LICENSE`: https://github.com/googleapis/gax-python/blob/master/LICENSE

@@ -30,19 +30,18 @@
 """Google API Extensions"""
 
 from __future__ import absolute_import
+
 import collections
 import logging
 import multiprocessing as mp
-import pkg_resources
 
 import dill
-
 from grpc import RpcError, StatusCode
-from google.rpc import code_pb2
+import pkg_resources
 
 from google.gax.errors import GaxError
 from google.gax.retry import retryable
-
+from google.rpc import code_pb2
 
 # pylint: disable=no-member
 __version__ = pkg_resources.get_distribution('google-gax').version

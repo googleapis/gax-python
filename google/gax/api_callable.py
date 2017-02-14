@@ -30,12 +30,12 @@
 """Provides function wrappers that implement page streaming and retrying."""
 
 from __future__ import absolute_import, division, unicode_literals
+
 import collections
 import platform
 
-import pkg_resources
-
 from future import utils
+import pkg_resources
 
 from google import gax
 from google.gax import bundling

@@ -30,6 +30,7 @@
 """Implements a utility for parsing and formatting path templates."""
 
 from __future__ import absolute_import
+
 from collections import namedtuple
 
 from ply import lex, yacc
