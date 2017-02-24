@@ -35,9 +35,9 @@ from __future__ import absolute_import
 import mock
 import unittest2
 
-from google.gax import bundling, BundleOptions, BundleDescriptor
+from google.gax import BundleDescriptor, BundleOptions, bundling
 
-from test.fixtures.fixture_pb2 import Simple, Outer, Bundled
+from tests.fixtures.fixture_pb2 import Bundled, Outer, Simple
 
 
 def _Simple(value, other_value=None):

@@ -1,3 +1,6 @@
 include LICENSE
 include README.rst
 global-include *.json
+graft google
+exclude tests
+global-exclude *.pyc __pycache__

@@ -34,14 +34,15 @@
 from __future__ import absolute_import
 
 import sys
+
+import google_auth_httplib2
+import mock
+from six.moves import reload_module
 import unittest2
 
 import google.auth.credentials
 import google.auth.transport.requests
 from google.gax import _grpc_google_auth
-import google_auth_httplib2
-import mock
-from six.moves import reload_module
 
 
 class TestGetDefaultCredentials(unittest2.TestCase):

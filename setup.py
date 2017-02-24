@@ -29,16 +29,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import re
-import sys
-from setuptools import setup, find_packages
+from setuptools import find_packages
+from setuptools import setup
 
-if sys.argv[-1] == 'publish':
-    os.system('python setup.py sdist upload')
-    sys.exit()
 
-install_requires = [
+DEPENDENCIES = [
     'dill>=0.2.5, <0.3dev',
     'future>=0.16.0, <0.17dev',
     'googleapis-common-protos>=1.5.2, <2.0dev',
@@ -60,7 +55,7 @@ setup(
     author_email='googleapis-packages@google.com',
     url='https://github.com/googleapis/gax-python',
     namespace_packages=('google',),
-    packages=find_packages(exclude=('test',)),
+    packages=find_packages(exclude=('tests',)),
     package_dir={'google-gax': 'google'},
     license='BSD-3-Clause',
     classifiers=[
@@ -75,7 +70,6 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
-    tests_require=['pytest'],
-    install_requires=install_requires,
+    install_requires=DEPENDENCIES,
     include_package_data=True,
 )

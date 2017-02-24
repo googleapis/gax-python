@@ -31,19 +31,20 @@
 """Unit tests for api_callable"""
 
 from __future__ import absolute_import, division
+
 import collections
 import platform
 
+import grpc
 import mock
 import pkg_resources
 import unittest2
 
 from google.gax import (
-    api_callable, bundling, BackoffSettings, BundleDescriptor, BundleOptions,
-    _CallSettings, CallOptions, INITIAL_PAGE, PageDescriptor, RetryOptions,
-    __version__ as GAX_VERSION)
+    __version__ as GAX_VERSION, _CallSettings, api_callable, BackoffSettings,
+    BundleDescriptor, BundleOptions, bundling, CallOptions, INITIAL_PAGE,
+    PageDescriptor, RetryOptions)
 from google.gax.errors import GaxError
-import grpc
 
 # pylint: disable=no-member
 GRPC_VERSION = pkg_resources.get_distribution('grpcio').version

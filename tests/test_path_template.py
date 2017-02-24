@@ -31,6 +31,7 @@
 """Unit tests for the path_template module."""
 
 from __future__ import absolute_import
+
 import unittest2
 
 from google.gax.path_template import PathTemplate, ValidationException

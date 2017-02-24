@@ -31,10 +31,11 @@
 """Unit tests for retry"""
 
 from __future__ import absolute_import, division
+
 import mock
 import unittest2
 
-from google.gax import (errors, retry, BackoffSettings, RetryOptions)
+from google.gax import BackoffSettings, errors, retry, RetryOptions
 
 _MILLIS_PER_SEC = 1000
 

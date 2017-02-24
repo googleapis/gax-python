@@ -31,18 +31,21 @@
 """Unit tests for gax package globals."""
 
 from __future__ import absolute_import
+
 import logging
 import multiprocessing as mp
+
 import mock
 import unittest2
 
-from test.fixtures.fixture_pb2 import Simple
+from google.gax import (
+    _CallSettings, _LOG, _OperationFuture, BundleOptions, CallOptions,
+    INITIAL_PAGE, OPTION_INHERIT, RetryOptions)
+from google.gax.errors import GaxError, RetryError
 from google.longrunning import operations_pb2
 from google.rpc import code_pb2, status_pb2
-from google.gax import (
-    BundleOptions, CallOptions, _CallSettings, INITIAL_PAGE, OPTION_INHERIT,
-    RetryOptions, _OperationFuture, _LOG)
-from google.gax.errors import GaxError, RetryError
+
+from tests.fixtures.fixture_pb2 import Simple
 
 
 class TestBundleOptions(unittest2.TestCase):

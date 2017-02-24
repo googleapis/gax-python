@@ -245,7 +245,7 @@ def main():
             replacements=_TEST_RC_REPLACEMENTS)
     lint_fileset('google', rc_filename=PRODUCTION_RC,
                  description='Library')
-    lint_fileset('tests', 'system_tests', rc_filename=TEST_RC,
+    lint_fileset('tests', rc_filename=TEST_RC,
                  description='Test')
 
 
