@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Copyright 2015, Google Inc.
+# Copyright 2017, Google Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,47 +27,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from setuptools import find_packages
-from setuptools import setup
+import unittest
+
+from google.gax.utils import oneof
 
 
-DEPENDENCIES = [
-    'dill>=0.2.5, <0.3dev',
-    'future>=0.16.0, <0.17dev',
-    'googleapis-common-protos>=1.5.2, <2.0dev',
-    'grpcio>=1.0.0, <2.0dev',
-    'oauth2client>=2.0.0, <4.0dev',
-    'ply==3.8',
-    'protobuf>=3.0.0, <4.0dev',
-]
+class TestOneof(unittest.TestCase):
+    def test_check_ok(self):
+        self.assertIsNone(oneof.check_oneof())
+        self.assertIsNone(oneof.check_oneof(foo='bar'))
+        self.assertIsNone(oneof.check_oneof(foo='bar', baz=None))
+        self.assertIsNone(oneof.check_oneof(foo=None, baz='bacon'))
+        self.assertIsNone(oneof.check_oneof(foo='bar', spam=None, eggs=None))
 
-with open('README.rst', 'r') as readme:
-    long_description = readme.read()
-
-setup(
-    name='google-gax',
-    version='0.15.7',
-    description='Google API Extensions',
-    long_description=long_description,
-    author='Google API Authors',
-    author_email='googleapis-packages@google.com',
-    url='https://github.com/googleapis/gax-python',
-    namespace_packages=('google',),
-    packages=find_packages(exclude=('tests',)),
-    package_dir={'google-gax': 'google'},
-    license='BSD-3-Clause',
-    classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: BSD License',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: Implementation :: CPython',
-    ],
-    install_requires=DEPENDENCIES,
-    include_package_data=True,
-)
+    def test_check_failures(self):
+        with self.assertRaises(ValueError):
+            oneof.check_oneof(foo='bar', spam='eggs')
+        with self.assertRaises(ValueError):
+            oneof.check_oneof(foo='bar', baz='bacon', spam='eggs')
