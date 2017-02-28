@@ -45,3 +45,5 @@ class TestOneof(unittest.TestCase):
             oneof.check_oneof(foo='bar', spam='eggs')
         with self.assertRaises(ValueError):
             oneof.check_oneof(foo='bar', baz='bacon', spam='eggs')
+        with self.assertRaises(ValueError):
+            oneof.check_oneof(foo='bar', spam=0, eggs=None)

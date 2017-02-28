@@ -31,11 +31,9 @@
 
 from __future__ import absolute_import
 
-import six
-
 
 def check_oneof(**kwargs):
-    """Raise ValueError if more than one keyword argument is truthy.
+    """Raise ValueError if more than one keyword argument is not none.
 
     Args:
         kwargs (dict): The keyword arguments sent to the function.
@@ -43,17 +41,14 @@ def check_oneof(**kwargs):
     Returns: None
 
     Raises:
-        ValueError: If more than one entry in kwargs is truthy.
+        ValueError: If more than one entry in kwargs is not none.
     """
     # Sanity check: If no keyword arguments were sent, this is fine.
     if not kwargs:
         return None
 
-    # Note: This code works because `any` stops consuming the iterable the
-    #   first time it encounters a truthy value; thus this check only
-    #   passes if there are two or more.
-    iterator = six.itervalues(kwargs)
-    if not (any(iterator) and not any(iterator)):
+    not_nones = [val for val in kwargs.values() if val is not None]
+    if len(not_nones) > 1:
         raise ValueError('Only one of {fields} should be set.'.format(
             fields=', '.join(sorted(kwargs.keys())),
         ))
