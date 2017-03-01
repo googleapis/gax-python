@@ -32,7 +32,6 @@
 
 from __future__ import absolute_import, division
 
-import collections
 import platform
 
 import grpc
@@ -302,28 +301,6 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertIn('gl-python/%s' % platform.python_version(), metadata)
         self.assertIn('gax/%s' % GAX_VERSION, metadata)
         self.assertIn('grpc/%s' % GRPC_VERSION, metadata)
-
-    def test_construct_with_ab(self):
-        defaults = api_callable.construct_settings(
-            _SERVICE_NAME, _A_CONFIG, dict(), _RETRY_DICT,
-            bundle_descriptors=_BUNDLE_DESCRIPTORS,
-            page_descriptors=_PAGE_DESCRIPTORS,
-            metrics_headers=collections.OrderedDict(
-                (('gl-abkey1', 'foo'), ('gl-abvalue1', 'bar')),
-            ))
-        settings = defaults['bundling_method']
-        metadata = settings.kwargs['metadata'][0][1]
-
-        # Establish that the appropriate strings are all part of the
-        # header, including the A/B key and value.
-        self.assertIn('gl-python/%s' % platform.python_version(), metadata)
-        self.assertIn('gax/%s' % GAX_VERSION, metadata)
-        self.assertIn('grpc/%s' % GRPC_VERSION, metadata)
-        self.assertIn('gl-abkey1/foo', metadata)
-        self.assertIn('gl-abvalue1/bar', metadata)
-
-        # Establish that the A/B key/value was shifted to the end.
-        self.assertTrue(metadata.endswith('gl-abkey1/foo gl-abvalue1/bar'))
 
     def test_construct_settings_override(self):
         _override = {

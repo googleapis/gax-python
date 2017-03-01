@@ -1,4 +1,4 @@
-# Copyright 2016, Google Inc. All rights reserved.
+# Copyright 2017, Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 # merge preserves those additions if the generated source changes.
 """Accesses the google.longrunning Operations API."""
 
+import collections
 import json
 import os
 import pkg_resources
@@ -70,10 +71,6 @@ class OperationsClient(object):
     DEFAULT_SERVICE_PORT = 443
     """The default port of the service."""
 
-    _CODE_GEN_NAME_VERSION = 'gapic/0.1.0'
-
-    _GAX_VERSION = pkg_resources.get_distribution('google-gax').version
-
     _PAGE_DESCRIPTORS = {
         'list_operations': _PageDesc('page_token', 'next_page_token',
                                      'operations')
@@ -91,8 +88,11 @@ class OperationsClient(object):
                  ssl_credentials=None,
                  scopes=None,
                  client_config=None,
-                 app_name='gax',
-                 app_version=_GAX_VERSION):
+                 app_name=None,
+                 app_version='',
+                 lib_name=None,
+                 lib_version='',
+                 metrics_headers=()):
         """Constructor.
 
         Args:
@@ -112,20 +112,49 @@ class OperationsClient(object):
             :func:`google.gax.construct_settings` for the structure of
             this data. Falls back to the default config if not specified
             or the specified config is missing data points.
-          app_name (string): The codename of the calling service.
-          app_version (string): The version of the calling service.
+          app_name (string): The name of the application calling
+            the service. Recommended for analytics purposes.
+          app_version (string): The version of the application calling
+            the service. Recommended for analytics purposes.
+          lib_name (string): The API library software used for calling
+            the service. (Unless you are writing an API client itself,
+            leave this as default.)
+          lib_version (string): The API library software version used
+            for calling the service. (Unless you are writing an API client
+            itself, leave this as default.)
+          metrics_headers (dict): A dictionary of values for tracking
+            client library metrics. Ultimately serializes to a string
+            (e.g. 'foo/1.2.3 bar/3.14.1'). This argument should be
+            considered private.
 
         Returns:
           A OperationsClient object.
         """
+        # Unless the calling application specifically requested
+        # OAuth scopes, request everything.
         if scopes is None:
             scopes = self._ALL_SCOPES
+
+        # Initialize an empty client config, if none is set.
         if client_config is None:
             client_config = {}
-        goog_api_client = '{}/{} {} gax/{} python/{}'.format(
-            app_name, app_version, self._CODE_GEN_NAME_VERSION,
-            self._GAX_VERSION, platform.python_version())
-        metadata = [('x-goog-api-client', goog_api_client)]
+
+        # Initialize metrics_headers as an ordered dictionary
+        # (cuts down on cardinality of the resulting string slightly).
+        metrics_headers = collections.OrderedDict(metrics_headers)
+        metrics_headers['gl-python'] = platform.python_version()
+
+        # The library may or may not be set, depending on what is
+        # calling this client. Newer client libraries set the library name
+        # and version.
+        if lib_name:
+            metrics_headers[lib_name] = lib_version
+
+        # Finally, track the GAPIC package version.
+        metrics_headers['gapic'] = pkg_resources.get_distribution(
+            'gapic-google-longrunning-v1', ).version
+
+        # Load the configuration defaults.
         default_client_config = json.loads(
             pkg_resources.resource_string(
                 __name__, 'operations_client_config.json').decode())
@@ -134,8 +163,8 @@ class OperationsClient(object):
             default_client_config,
             client_config,
             config.STATUS_CODE_NAMES,
-            kwargs={'metadata': metadata},
-            page_descriptors=self._PAGE_DESCRIPTORS)
+            metrics_headers=metrics_headers,
+            page_descriptors=self._PAGE_DESCRIPTORS, )
         self.operations_stub = config.create_stub(
             operations_pb2.OperationsStub,
             channel=channel,
@@ -183,6 +212,7 @@ class OperationsClient(object):
           :exc:`google.gax.errors.GaxError` if the RPC is aborted.
           :exc:`ValueError` if the parameters are invalid.
         """
+        # Create the request object.
         request = operations_pb2.GetOperationRequest(name=name)
         return self._get_operation(request, options)
 
@@ -232,6 +262,7 @@ class OperationsClient(object):
           :exc:`google.gax.errors.GaxError` if the RPC is aborted.
           :exc:`ValueError` if the parameters are invalid.
         """
+        # Create the request object.
         request = operations_pb2.ListOperationsRequest(
             name=name, filter=filter_, page_size=page_size)
         return self._list_operations(request, options)
@@ -264,6 +295,7 @@ class OperationsClient(object):
           :exc:`google.gax.errors.GaxError` if the RPC is aborted.
           :exc:`ValueError` if the parameters are invalid.
         """
+        # Create the request object.
         request = operations_pb2.CancelOperationRequest(name=name)
         self._cancel_operation(request, options)
 
@@ -289,5 +321,6 @@ class OperationsClient(object):
           :exc:`google.gax.errors.GaxError` if the RPC is aborted.
           :exc:`ValueError` if the parameters are invalid.
         """
+        # Create the request object.
         request = operations_pb2.DeleteOperationRequest(name=name)
         self._delete_operation(request, options)

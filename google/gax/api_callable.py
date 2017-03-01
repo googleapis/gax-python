@@ -31,14 +31,11 @@
 
 from __future__ import absolute_import, division, unicode_literals
 
-import collections
-import platform
-
 from future import utils
-import pkg_resources
 
 from google import gax
 from google.gax import bundling
+from google.gax.utils import metrics
 
 _MILLIS_PER_SECOND = 1000
 
@@ -294,12 +291,8 @@ def construct_settings(
     # pylint: disable=protected-access
     defaults = {}
     bundle_descriptors = bundle_descriptors or {}
-    metrics_headers = collections.OrderedDict(metrics_headers)
     page_descriptors = page_descriptors or {}
     kwargs = kwargs or {}
-
-    # Add the language header to metrics.
-    metrics_headers['gl-python'] = platform.python_version()
 
     # Sanity check: It is possible that we got this far but some headers
     # were specified with an older library, which sends them as...
@@ -313,28 +306,12 @@ def construct_settings(
         kwargs['metadata'] = [value for value in kwargs['metadata']
                               if value[0].lower() != 'x-goog-api-client']
 
-    # Add the GAX and GRPC headers to our metrics.
-    # pylint: disable=no-member
-    grpc_version = pkg_resources.get_distribution('grpcio').version
-    # pylint: enable=no-member
-    metrics_headers['gax'] = gax.__version__
-    metrics_headers['grpc'] = grpc_version
-
-    # A/B key-value pairs belong at the end of the metadata string;
-    # shift any that appear to the end of the dictionary.
-    ab_keys = [k for k in metrics_headers.keys() if k.startswith('gl-ab')]
-    for key in ab_keys:
-        value = metrics_headers.pop(key)
-        metrics_headers[key] = value
-
-    # Okay, now add our new and complete metadata into the old
-    # kwargs format:
-    #   kwargs={'metadata': [('x-goog-api-client', 'gax/x.y.z grpc/x.y.z')]}
-    #
-    # This is how it will be sent to the underlying GRPC layer.
-    header = ' '.join(['%s/%s' % (k, v) for k, v in metrics_headers.items()])
+    # Fill out the metrics headers with GAX and GRPC info, and convert
+    # to a string in the format that the GRPC layer expects.
     kwargs.setdefault('metadata', [])
-    kwargs['metadata'].append(('x-goog-api-client', header))
+    kwargs['metadata'].append(
+        ('x-goog-api-client', metrics.stringify(metrics.fill(metrics_headers)))
+    )
 
     try:
         service_config = client_config['interfaces'][service_name]

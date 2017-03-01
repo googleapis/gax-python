@@ -27,25 +27,53 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+"""Utility functions for manipulation of metrics headers."""
+
 from __future__ import absolute_import
 
-import unittest
+import collections
+import platform
 
-from google.gax.utils import oneof
+import pkg_resources
+
+from google import gax
 
 
-class TestOneof(unittest.TestCase):
-    def test_check_ok(self):
-        self.assertIsNone(oneof.check_oneof())
-        self.assertIsNone(oneof.check_oneof(foo='bar'))
-        self.assertIsNone(oneof.check_oneof(foo='bar', baz=None))
-        self.assertIsNone(oneof.check_oneof(foo=None, baz='bacon'))
-        self.assertIsNone(oneof.check_oneof(foo='bar', spam=None, eggs=None))
+def fill(metrics_headers=()):
+    """Add the metrics headers known to GAX.
 
-    def test_check_failures(self):
-        with self.assertRaises(ValueError):
-            oneof.check_oneof(foo='bar', spam='eggs')
-        with self.assertRaises(ValueError):
-            oneof.check_oneof(foo='bar', baz='bacon', spam='eggs')
-        with self.assertRaises(ValueError):
-            oneof.check_oneof(foo='bar', spam=0, eggs=None)
+    Return an OrderedDict with all of the metrics headers provided to
+    this function, as well as the metrics known to GAX (such as its own
+    version, the GRPC version, etc.).
+    """
+    # Create an ordered dictionary with the Python version, which
+    # should go first.
+    answer = collections.OrderedDict((
+        ('gl-python', platform.python_version()),
+    ))
+
+    # Add anything that already appears in the passed metrics headers,
+    # in order.
+    for k, v in collections.OrderedDict(metrics_headers).items():
+        answer[k] = v
+
+    # Add the GAX and GRPC headers to our metrics.
+    # These come after what may have been passed in (generally the GAPIC
+    # library).
+    answer['gax'] = gax.__version__
+    # pylint: disable=no-member
+    answer['grpc'] = pkg_resources.get_distribution('grpcio').version
+    # pylint: enable=no-member
+
+    return answer
+
+
+def stringify(metrics_headers=()):
+    """Convert the provided metrics headers to a string.
+
+    Iterate over the metrics headers (a dictionary, usually ordered) and
+    return a properly-formatted space-separated string
+    (e.g. foo/1.2.3 bar/3.14.159).
+    """
+    metrics_headers = collections.OrderedDict(metrics_headers)
+    return ' '.join(['%s/%s' % (k, v) for k, v in metrics_headers.items()])
