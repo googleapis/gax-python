@@ -129,11 +129,9 @@ def retryable(a_func, retry_options, **kwargs):
                 exc = errors.RetryError(
                     'Retry total timeout exceeded with exception', exception)
 
-                # Sleep a random number which will, on average, equal half of
-                # the given delay.
-                # TODO (lukesneeringer): This is probably unexpected behavior,
-                # but we do it in every language. Perhaps we should change it.
-                to_sleep = random.uniform(0, delay)
+                # Sleep a random number which will, on average, equal the
+                # expected delay.
+                to_sleep = random.uniform(0, delay * 2)
                 time.sleep(to_sleep / _MILLIS_PER_SECOND)
                 delay = min(delay * delay_mult, max_delay_millis)
 
