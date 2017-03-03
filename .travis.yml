@@ -11,7 +11,7 @@ matrix:
   # Disabled until gRPC supports PyPy.
   # - python: pypy
   #   env: TOXENV=pypy
-  - python: 3.6
+  - python: 3.5
     env: TOXENV=lint
   - python: 3.6
     env: TOXENV=docs
