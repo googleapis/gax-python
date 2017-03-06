@@ -150,10 +150,6 @@ class OperationsClient(object):
         if lib_name:
             metrics_headers[lib_name] = lib_version
 
-        # Finally, track the GAPIC package version.
-        metrics_headers['gapic'] = pkg_resources.get_distribution(
-            'gapic-google-longrunning-v1', ).version
-
         # Load the configuration defaults.
         default_client_config = json.loads(
             pkg_resources.resource_string(
