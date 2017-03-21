@@ -29,6 +29,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import io
+
 from setuptools import find_packages
 from setuptools import setup
 
@@ -43,7 +45,7 @@ DEPENDENCIES = [
     'protobuf>=3.0.0, <4.0dev',
 ]
 
-with open('README.rst', 'r') as readme:
+with io.open('README.rst', 'r') as readme:
     long_description = readme.read()
 
 setup(
@@ -54,9 +56,8 @@ setup(
     author='Google API Authors',
     author_email='googleapis-packages@google.com',
     url='https://github.com/googleapis/gax-python',
+    packages=find_packages(exclude=('tests*',)),
     namespace_packages=('google',),
-    packages=find_packages(exclude=('tests',)),
-    package_dir={'google-gax': 'google'},
     license='BSD-3-Clause',
     classifiers=[
         'Development Status :: 3 - Alpha',
