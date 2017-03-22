@@ -1,6 +1,4 @@
-include LICENSE
-include README.rst
-global-include *.json
-graft google
-exclude tests
-global-exclude *.pyc __pycache__
+include LICENSE README.rst
+recursive-include google *.json
+recursive-include tests *
+global-exclude __pycache__ *.pyc
