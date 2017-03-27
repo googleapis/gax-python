@@ -33,12 +33,7 @@ from __future__ import absolute_import
 
 from grpc import RpcError, StatusCode
 
-# Preferentially use google-auth.
-try:
-    from google.gax import _grpc_google_auth as _grpc_auth
-# Fallback to oauth2client.
-except ImportError:
-    from google.gax import _grpc_oauth2client as _grpc_auth
+from google.gax import _grpc_google_auth
 
 
 API_ERRORS = (RpcError, )
@@ -106,9 +101,9 @@ def create_stub(generated_create_stub, channel=None, service_path=None,
         target = '{}:{}'.format(service_path, service_port)
 
         if credentials is None:
-            credentials = _grpc_auth.get_default_credentials(scopes)
+            credentials = _grpc_google_auth.get_default_credentials(scopes)
 
-        channel = _grpc_auth.secure_authorized_channel(
+        channel = _grpc_google_auth.secure_authorized_channel(
             credentials, target, ssl_credentials=ssl_credentials)
 
     return generated_create_stub(channel)

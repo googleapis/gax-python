@@ -40,7 +40,7 @@ DEPENDENCIES = [
     'future>=0.16.0, <0.17dev',
     'googleapis-common-protos>=1.5.2, <2.0dev',
     'grpcio>=1.0.2, <2.0dev',
-    'oauth2client>=2.0.0, <4.0dev',
+    'google-auth>=0.8.0, <2.0dev',
     'ply==3.8',
     'protobuf>=3.0.0, <4.0dev',
 ]
