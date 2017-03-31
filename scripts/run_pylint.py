@@ -49,7 +49,7 @@ _PRODUCTION_RC_ADDITIONS = {
 }
 _PRODUCTION_RC_REPLACEMENTS = {
     'MASTER': {
-        'ignore': ['CVS', '.git', '.cache', '.tox', '.nox'],
+        'ignore': ['CVS', '.git', '.cache', '.tox', '.nox', 'gapic'],
         'load-plugins': 'pylint.extensions.check_docs',
     },
     'REPORTS': {

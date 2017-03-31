@@ -51,13 +51,11 @@ def _bundleable(desc):
     bundled call.
 
     Args:
-      base_caller (callable): the basic API caller for the fallback when
-        bundling is actually disabled for the call.
       desc (gax.BundleDescriptor): describes the bundling that a_func
         supports.
 
     Returns:
-      callable: takes the API call's request and keyword args and returns a
+      Callable: takes the API call's request and keyword args and returns a
         bundling.Event object.
 
     """
@@ -79,8 +77,9 @@ def _page_streamable(page_descriptor):
     Args:
         page_descriptor (:class:`PageDescriptor`): indicates the structure
           of page streaming to be performed.
+
     Returns:
-        A function that returns an iterator.
+        Callable: A function that returns an iterator.
     """
 
     def inner(a_func, settings, request, **kwargs):
@@ -99,15 +98,17 @@ def _construct_bundling(bundle_config, bundle_descriptor):
     """Helper for ``construct_settings()``.
 
     Args:
-      bundle_config: A dictionary specifying a bundle parameters, the value for
-        'bundling' field in a method config (See ``construct_settings()`` for
-        information on this config.)
-      bundle_descriptor: A BundleDescriptor object describing the structure of
-        bundling for this method. If not set, this method will not bundle.
+      bundle_config (dict): A dictionary specifying a bundle parameters, the
+        value for 'bundling' field in a method config (See
+        ``construct_settings()`` for information on this config.)
+      bundle_descriptor (BundleDescriptor): A BundleDescriptor object
+        describing the structure of bundling for this method. If not set,
+        this method will not bundle.
 
     Returns:
-      A tuple (bundling.Executor, BundleDescriptor) that configures bundling.
-      The bundling.Executor may be None if this method should not bundle.
+      Tuple[bundling.Executor, BundleDescriptor]: A tuple that configures
+        bundling. The bundling.Executor may be None if this method should not
+        bundle.
     """
     if bundle_config and bundle_descriptor:
         bundler = bundling.Executor(gax.BundleOptions(
@@ -128,20 +129,20 @@ def _construct_retry(method_config, retry_codes, retry_params, retry_names):
     """Helper for ``construct_settings()``.
 
     Args:
-      method_config: A dictionary representing a single ``methods`` entry of the
-        standard API client config file. (See ``construct_settings()`` for
-        information on this yaml.)
-      retry_codes: A dictionary parsed from the ``retry_codes`` entry
+      method_config (dict): A dictionary representing a single ``methods``
+        entry of the standard API client config file. (See
+        ``construct_settings()`` for information on this yaml.)
+      retry_codes (dict): A dictionary parsed from the ``retry_codes`` entry
         of the standard API client config file. (See ``construct_settings()``
         for information on this yaml.)
-      retry_params: A dictionary parsed from the ``retry_params`` entry
+      retry_params (dict): A dictionary parsed from the ``retry_params`` entry
         of the standard API client config file. (See ``construct_settings()``
         for information on this yaml.)
-      retry_names: A dictionary mapping the string names used in the
+      retry_names (dict): A dictionary mapping the string names used in the
         standard API client config file to API response status codes.
 
     Returns:
-      A RetryOptions object, or None.
+      Optional[RetryOptions]: The retry options, if applicable.
     """
     if method_config is None:
         return None
@@ -172,13 +173,13 @@ def _merge_retry_options(retry_options, overrides):
     Takes two retry options, and merges them into a single RetryOption instance.
 
     Args:
-      retry_options: The base RetryOptions.
-      overrides: The RetryOptions used for overriding ``retry``. Use the values
-        if it is not None. If entire ``overrides`` is None, ignore the base
-        retry and return None.
+      retry_options (RetryOptions): The base RetryOptions.
+      overrides (RetryOptions): The RetryOptions used for overriding ``retry``.
+        Use the values if it is not None. If entire ``overrides`` is None,
+        ignore the base retry and return None.
 
     Returns:
-      The merged RetryOptions, or None if it will be canceled.
+      RetryOptions: The merged options, or None if it will be canceled.
     """
     if overrides is None:
         return None
@@ -264,24 +265,31 @@ def construct_settings(
        }
 
     Args:
-      service_name: The fully-qualified name of this service, used as a key into
-        the client config file (in the example above, this value should be
-        ``google.fake.v1.ServiceName``).
-      client_config: A dictionary parsed from the standard API client config
-        file.
-      bundle_descriptors: A dictionary of method names to BundleDescriptor
-        objects for methods that are bundling-enabled.
-      page_descriptors: A dictionary of method names to PageDescriptor objects
-        for methods that are page streaming-enabled.
-      config_override: A dictionary in the same structure of client_config to
-        override the settings. Usually client_config is supplied from the
-        default config and config_override will be specified by users.
-      retry_names: A dictionary mapping the strings referring to response status
-        codes to the Python objects representing those codes.
-      metrics_headers: Dictionary of headers to be passed for analytics.
-        Sent as a dictionary; eventually becomes a space-separated string
-        (e.g. 'foo/1.0.0 bar/3.14.1').
-      kwargs: The keyword arguments to be passed to the API calls.
+      service_name (str): The fully-qualified name of this service, used as a
+        key into the client config file (in the example above, this value
+        would be ``google.fake.v1.ServiceName``).
+      client_config (dict): A dictionary parsed from the standard API client
+        config file.
+      bundle_descriptors (Mapping[str, BundleDescriptor]): A dictionary of
+        method names to BundleDescriptor objects for methods that are
+        bundling-enabled.
+      page_descriptors (Mapping[str, PageDescriptor]): A dictionary of method
+        names to PageDescriptor objects for methods that are page
+        streaming-enabled.
+      config_override (str): A dictionary in the same structure of
+        client_config to override the settings. Usually client_config is
+        supplied from the default config and config_override will be
+        specified by users.
+      retry_names (Mapping[str, object]): A dictionary mapping the strings
+        referring to response status codes to the Python objects representing
+        those codes.
+      metrics_headers (Mapping[str, str]): Dictionary of headers to be passed
+        for analytics. Sent as a dictionary; eventually becomes a
+        space-separated string (e.g. 'foo/1.0.0 bar/3.14.1').
+      kwargs (dict): The keyword arguments to be passed to the API calls.
+
+    Returns:
+      dict: A dictionary mapping method names to _CallSettings.
 
     Raises:
       KeyError: If the configuration for the service in question cannot be
@@ -360,7 +368,7 @@ def _catch_errors(a_func, to_catch):
         to_catch (list[Exception]): Configures the exceptions to wrap.
 
     Returns:
-        A function that will wrap certain exceptions with GaxError
+        Callable: A function that will wrap certain exceptions with GaxError
     """
     def inner(*args, **kwargs):
         """Wraps specified exceptions"""
@@ -390,11 +398,12 @@ def create_api_call(func, settings):
     bundling does the signature change.
 
     Args:
-      func (callable[[object], object]): is used to make a bare rpc call
-      settings (:class:`_CallSettings`): provides the settings for this call
+      func (Callable[Sequence[object], object]): is used to make a bare rpc
+        call.
+      settings (_CallSettings): provides the settings for this call
 
     Returns:
-      func (callable[[object], object]): a bound method on a request stub used
+      Callable[Sequence[object], object]: a bound method on a request stub used
         to make an rpc call
 
     Raises:

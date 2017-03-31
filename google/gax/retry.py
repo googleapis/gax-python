@@ -56,7 +56,7 @@ def add_timeout_arg(a_func, timeout, **kwargs):
       a_func (callable): a callable to be updated
       timeout (int): to be added to the original callable as it final positional
         arg.
-
+      kwargs: Addtional arguments passed through to the callable.
 
     Returns:
       callable: the original callable updated to the timeout arg
@@ -79,9 +79,10 @@ def retryable(a_func, retry_options, **kwargs):
       retry_options (RetryOptions): Configures the exceptions upon which the
         callable should retry, and the parameters to the exponential backoff
         retry algorithm.
+      kwargs: Addtional arguments passed through to the callable.
 
     Returns:
-      A function that will retry on exception.
+        Callable: A function that will retry on exception.
     """
     delay_mult = retry_options.backoff_settings.retry_delay_multiplier
     max_delay_millis = retry_options.backoff_settings.max_retry_delay_millis
