@@ -58,14 +58,14 @@ def _str_dotted_getattr(obj, name):
     """Expands extends getattr to allow dots in x to indicate nested objects.
 
     Args:
-       obj: an object.
-       name: a name for a field in the object.
+       obj (object): an object.
+       name (str): a name for a field in the object.
 
     Returns:
-       the value of named attribute.
+       Any: the value of named attribute.
 
     Raises:
-       AttributeError if the named attribute does not exist.
+       AttributeError: if the named attribute does not exist.
     """
     for part in name.split('.'):
         obj = getattr(obj, part)
@@ -85,12 +85,12 @@ def compute_bundle_id(obj, discriminator_fields):
     if any discriminator field cannot be found, ValueError is raised.
 
     Args:
-      obj: an object.
-      discriminator_fields: a list of discriminator fields in the order to be
-        to be used in the id.
+      obj (object): an object.
+      discriminator_fields (Sequence[str]): a list of discriminator fields in
+        the order to be to be used in the id.
 
     Returns:
-      tuple: computed as described above.
+      Tuple[str]: computed as described above.
 
     Raises:
       AttributeError: if any discriminator fields attribute does not exist.
@@ -109,16 +109,17 @@ class Task(object):
 
     def __init__(self, api_call, bundle_id, bundled_field, bundling_request,
                  kwargs, subresponse_field=None):
-        """Constructor.
-
+        """
         Args:
-           api_call (callable[[object], object]): the func that is this tasks's
-             API call.
-           bundle_id (tuple): the id of this bundle.
-           bundle_field (str): the field used to create the bundled request.
-           bundling_request (object): the request to pass as the arg to api_call.
+           api_call (Callable[Sequence[object], object]): the func that is this
+             tasks's API call.
+           bundle_id (Tuple[str]): the id of this bundle.
+           bundled_field (str): the field used to create the bundled request.
+           bundling_request (object): the request to pass as the arg to
+              api_call.
            kwargs (dict): keyword arguments passed to api_call.
-           subresponse_field (str): optional field used to demultiplex responses.
+           subresponse_field (str): optional field used to demultiplex
+              responses.
 
         """
         self._api_call = api_call
@@ -189,7 +190,6 @@ class Task(object):
                 for i, event in zip(in_sizes, self._event_deque):
                     next_copy = copy.copy(resp)
                     subresponses = all_subresponses[start:start + i]
-                    # TODO: assumes we are using GRPC; abstract into config.py for portability
                     next_copy.ClearField(subresponse_field)
                     getattr(next_copy, subresponse_field).extend(subresponses)
                     start += i
@@ -207,11 +207,11 @@ class Task(object):
         """Adds elts to the tasks.
 
         Args:
-           elts: a iterable of elements that can be appended to the task's
-            bundle_field.
+           elts (Sequence): a iterable of elements that can be appended to the
+            task's bundle_field.
 
         Returns:
-           an :class:`Event` that can be used to wait on the response.
+            Event: an event that can be used to wait on the response.
         """
         # Use a copy, not a reference, as it is later necessary to mutate
         # the proto field from which elts are drawn in order to construct
@@ -238,8 +238,8 @@ class Task(object):
             """Cancels submission of ``elts`` as part of this bundle.
 
             Returns:
-               ``False`` if any of elements had already been sent, otherwise
-               ``True``.
+               bool: ``False`` if any of elements had already been sent,
+               otherwise ``True``.
             """
             try:
                 self._event_deque.remove(event)
@@ -296,7 +296,7 @@ class Executor(object):
           kwargs (dict): optional, the keyword arguments passed to the API call.
 
         Returns:
-           an :class:`Event`.
+           Event: the scheduled event.
         """
         kwargs = kwargs or dict()
         bundle = self._bundle_for(api_call, bundle_id, bundle_desc,

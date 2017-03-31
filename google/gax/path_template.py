@@ -90,8 +90,8 @@ class PathTemplate(object):
             str: The rendered instantiation of this path template.
 
         Raises:
-            ValidationError: If a key isn't provided or if a sub-template can't
-                be parsed.
+            ValidationException: If a key isn't provided or if a sub-template
+                can't be parsed.
         """
         out = []
         binding = False
@@ -192,9 +192,13 @@ class _Parser(object):
         """Returns a list of path template segments parsed from data.
 
         Args:
-            data: A path template string.
+            data (str): A path template string.
+
         Returns:
-            A list of _Segment.
+            Sequence[_PathSegment]: The path template segments.
+
+        Raises:
+            ValidationException: If the path template is invalid.
         """
         self.binding_var_count = 0
         self.segment_count = 0

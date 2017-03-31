@@ -80,22 +80,24 @@ def create_stub(generated_create_stub, channel=None, service_path=None,
     """Creates a gRPC client stub.
 
     Args:
-        generated_create_stub: The generated gRPC method to create a stub.
-        channel: A Channel object through which to make calls. If none, a secure
-            channel is constructed. If specified, all remaining arguments are
-            ignored.
-        service_path: The domain name of the API remote host.
-        service_port: The port on which to connect to the remote host.
-        credentials: The authorization credentials to attach to requests.
-            These credentials identify your application to the service.
-        scopes: The OAuth scopes for this service. This parameter is ignored if
-            a credentials is specified.
-        ssl_credentials: gRPC channel credentials used to create a secure
-            gRPC channel. If not specified, SSL credentials will be created
-            using default certificates.
+        generated_create_stub (Callable): The generated gRPC method to create a
+            stub.
+        channel (grpc.Channel): A Channel object through which to make calls.
+            If None, a secure channel is constructed. If specified, all
+            remaining arguments are ignored.
+        service_path (str): The domain name of the API remote host.
+        service_port (int): The port on which to connect to the remote host.
+        credentials (google.auth.credentials.Credentials): The authorization
+            credentials to attach to requests. These credentials identify your
+            application to the service.
+        scopes (Sequence[str]): The OAuth scopes for this service. This
+            parameter is ignored if a credentials is specified.
+        ssl_credentials (grpc.ChannelCredentials): gRPC channel credentials
+            used to create a secure gRPC channel. If not specified, SSL
+            credentials will be created using default certificates.
 
     Returns:
-        A gRPC client stub.
+        grpc.Client: A gRPC client stub.
     """
     if channel is None:
         target = '{}:{}'.format(service_path, service_port)

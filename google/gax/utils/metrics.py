@@ -54,8 +54,8 @@ def fill(metrics_headers=()):
 
     # Add anything that already appears in the passed metrics headers,
     # in order.
-    for k, v in collections.OrderedDict(metrics_headers).items():
-        answer[k] = v
+    for key, value in collections.OrderedDict(metrics_headers).items():
+        answer[key] = value
 
     # Add the GAX and GRPC headers to our metrics.
     # These come after what may have been passed in (generally the GAPIC

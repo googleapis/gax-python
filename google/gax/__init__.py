@@ -75,17 +75,17 @@ class _CallSettings(object):
         Args:
             timeout (int): The client-side timeout for API calls. This
               parameter is ignored for retrying calls.
-            retry (:class:`RetryOptions`): The configuration for retrying upon
+            retry (RetryOptions): The configuration for retrying upon
               transient error. If set to None, this call will not retry.
-            page_descriptor (:class:`PageDescriptor`): indicates the structure
+            page_descriptor (PageDescriptor): indicates the structure
               of page streaming to be performed. If set to None, page streaming
               is disabled.
             page_token (str): If there is no ``page_descriptor``, this attribute
               has no meaning. Otherwise, determines the page token used in the
               page streaming request.
-            bundler (:class:`gax.bundling.Executor`): orchestrates bundling. If
+            bundler (gax.bundling.Executor): orchestrates bundling. If
               None, bundling is not performed.
-            bundle_descriptor (:class:`BundleDescriptor`): indicates the
+            bundle_descriptor (BundleDescriptor): indicates the
               structure of of the bundle. If None, bundling is disabled.
             kwargs (dict): other keyword arguments to be passed to the API
               calls.
@@ -117,12 +117,12 @@ class _CallSettings(object):
         permits toggling per-resource/per-page page streaming.
 
         Args:
-            options (:class:`CallOptions`): an instance whose values override
+            options (CallOptions): an instance whose values override
               those in this object. If None, ``merge`` returns a copy of this
               object
 
         Returns:
-            A :class:`_CallSettings` object.
+            CallSettings: The merged settings and options.
         """
         if not options:
             return _CallSettings(
@@ -177,8 +177,7 @@ class CallOptions(object):
     # pylint: disable=too-few-public-methods
     def __init__(self, timeout=OPTION_INHERIT, retry=OPTION_INHERIT,
                  page_token=OPTION_INHERIT, is_bundling=False, **kwargs):
-        """Constructor.
-
+        """
         Example:
            >>> # change an api call's timeout
            >>> o1 = CallOptions(timeout=30)  # make the timeout 30 seconds
@@ -195,7 +194,7 @@ class CallOptions(object):
 
         Args:
             timeout (int): The client-side timeout for non-retrying API calls.
-            retry (:class:`RetryOptions`): determines whether and how to retry
+            retry (RetryOptions): determines whether and how to retry
               on transient errors. When set to None, the call will not retry.
             page_token (str): If set and the call is configured for page
               streaming, page streaming is performed per-page, starting with
@@ -204,6 +203,10 @@ class CallOptions(object):
               streaming is performed per-resource.
             is_bundling (bool): If set and the call is configured for bundling,
               bundling is performed. Bundling is always disabled by default.
+            kwargs: Additional arguments passed through to the API call.
+
+        Raises:
+          ValueError: if incompatible options are specified.
         """
         if not (timeout == OPTION_INHERIT or retry == OPTION_INHERIT):
             raise ValueError('The CallOptions has incompatible settings: '
@@ -360,29 +363,33 @@ class BundleOptions(
         specify at least one valid threshold value during construction.
 
         Args:
-           element_count_threshold: the bundled request will be sent once the
-             count of outstanding elements in the repeated field reaches this
-             value.
-           element_count_limit: represents a hard limit on the number of
-             elements in the repeated field of the bundle; if adding a request
-             to a bundle would exceed this value, the bundle is sent and the new
-             request is added to a fresh bundle. It is invalid for a single
-             request to exceed this limit.
-           request_byte_threshold: the bundled request will be sent once the
-             count of bytes in the request reaches this value. Note that this
-             value is pessimistically approximated by summing the bytesizes of
-             the elements in the repeated field, with a buffer applied to
-             compensate for the corresponding under-approximation.
-           request_byte_limit: represents a hard limit on the size of the
-             bundled request; if adding a request to a bundle would exceed this
-             value, the bundle is sent and the new request is added to a fresh
-             bundle. It is invalid for a single request to exceed this
-             limit. Note that this value is pessimistically approximated by
-             summing the bytesizes of the elements in the repeated field, with a
-             buffer applied to correspond to the resulting under-approximation.
-           delay_threshold: the bundled request will be sent this amount of
-             time after the first element in the bundle was added to it.
+            element_count_threshold (int): the bundled request will be sent
+                once the count of outstanding elements in the repeated field
+                reaches this value.
+            element_count_limit (int): represents a hard limit on the number of
+                elements in the repeated field of the bundle; if adding a
+                request to a bundle would exceed this value, the bundle is sent
+                and the new request is added to a fresh bundle. It is invalid
+                for a single request to exceed this limit.
+            request_byte_threshold (int): the bundled request will be sent once
+                the count of bytes in the request reaches this value. Note that
+                this value is pessimistically approximated by summing the
+                bytesizes of the elements in the repeated field, with a buffer
+                applied to compensate for the corresponding
+                under-approximation.
+            request_byte_limit (int): represents a hard limit on the size of
+                the bundled request; if adding a request to a bundle would
+                exceed this value, the bundle is sent and the new request is
+                added to a fresh bundle. It is invalid for a single request to
+                exceed this limit. Note that this value is pessimistically
+                approximated by summing the bytesizes of the elements in the
+                repeated field, with a buffer applied to correspond to the
+                resulting under-approximation.
+            delay_threshold (int): the bundled request will be sent this amount
+                of time after the first element in the bundle was added to it.
 
+        Returns:
+          BundleOptions: the constructed object.
         """
         assert isinstance(element_count_threshold, int), 'should be an int'
         assert isinstance(element_count_limit, int), 'should be an int'
@@ -415,13 +422,13 @@ class PageIterator(object):
         to be made.
     """
     # pylint: disable=too-few-public-methods
-    def __init__(self, api_call, page_descriptor, page_token, request, **kwargs):
-        """Constructor.
-
+    def __init__(self, api_call, page_descriptor, page_token, request,
+                 **kwargs):
+        """
         Args:
-          api_call (callable[[req], resp]): an API call that is page
+          api_call (Callable[[req], resp]): an API call that is page
             streaming.
-          page_descriptor (:class:`PageDescriptor`): indicates the structure
+          page_descriptor (PageDescriptor): indicates the structure
             of page streaming to be performed.
           page_token (str): The page token to be passed to API call request.
             If no page token has yet been acquired, this field should be set
@@ -430,10 +437,7 @@ class PageIterator(object):
             token field of the request is overwritten by the ``page_token``
             passed to the constructor, unless ``page_token`` is
             ``INITIAL_PAGE``.
-          **kwargs: Arbitrary keyword arguments to be passed to the API call.
-
-        Returns:
-          A PageIterator object.
+          kwargs: Arbitrary keyword arguments to be passed to the API call.
         """
         self.response = None
         self.page_token = page_token or INITIAL_PAGE
@@ -509,7 +513,10 @@ def _from_any(pb_type, any_pb):
         any_pb (google.protobuf.any_pb2.Any): the object to be converted.
 
     Returns:
-        An instance of the pb_type message.
+        pb_type: An instance of the pb_type message.
+
+    Raises:
+        TypeError: if the message could not be converted.
     """
     msg = pb_type()
     # Check exceptional case: raise if can't Unpack
@@ -544,16 +551,16 @@ class _OperationFuture(object):
 
     def __init__(self, operation, client, result_type, metadata_type,
                  call_options=None):
-        """Constructor.
-
+        """
         Args:
             operation (google.longrunning.Operation): the initial long-running
                 operation object.
-            client (google.gapic.longrunning.operations_client.OperationsClient):
+            client
+                (google.gapic.longrunning.operations_client.OperationsClient):
                 a client for the long-running operation service.
             result_type (type): the class type of the result.
-            metadata_type (type, optional): the class type of the metadata.
-            call_options (google.gax.CallOptions, optional): the call options
+            metadata_type (Optional[type]): the class type of the metadata.
+            call_options (Optional[google.gax.CallOptions]): the call options
                 that are used when reloading the operation.
         """
         self._operation = operation
@@ -670,7 +677,6 @@ class _OperationFuture(object):
         # Also, we need to send 0 instead of None for the rpc arguments,
         # because an internal method (`_has_timeout_settings`) will
         # erroneously return False otherwise.
-        # TODO (lukesneeringer): Look into this.
         rpc_arg = None
         if timeout is not None:
             timeout *= 1000
