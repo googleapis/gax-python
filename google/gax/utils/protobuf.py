@@ -124,7 +124,27 @@ def set(pb_or_dict, key, value):
     # with.
     if isinstance(pb_or_dict, collections.MutableMapping):
         pb_or_dict[key] = value
-    else:  # isinstance(pb_or_dict, Message):
+    elif isinstance(value, (collections.MutableSequence, tuple)):
+        # Clear the existing repeated protobuf message of any elements
+        # currently inside it.
+        while len(getattr(pb_or_dict, key)) > 0:
+            getattr(pb_or_dict, key).pop()
+
+        # Write our new elements to the repeated field.
+        for v in value:
+            if isinstance(v, collections.Mapping):
+                getattr(pb_or_dict, key).add(**v)
+            else:
+                getattr(pb_or_dict, key).extend([v])
+    elif isinstance(value, collections.Mapping):
+        # Assign the dictionary values to the protobuf message.
+        for k, v in value.items():
+            set(getattr(pb_or_dict, key), k, v)
+    elif isinstance(value, Message):
+        # Assign the protobuf message values to the protobuf message.
+        for k, v in value.ListFields():
+            set(getattr(pb_or_dict, key), k.name, v)
+    else:
         setattr(pb_or_dict, key, value)
 
 

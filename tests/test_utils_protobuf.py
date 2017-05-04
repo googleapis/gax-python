@@ -31,6 +31,7 @@ import unittest
 
 import pytest
 
+from google.api import http_pb2
 from google.gax.utils import protobuf
 from google.longrunning import operations_proto_pb2 as ops
 
@@ -88,6 +89,46 @@ class SetTests(unittest.TestCase):
         obj = object()
         with pytest.raises(TypeError):
             protobuf.set(obj, 'foo', 'bar')
+
+    def test_set_list(self):
+        list_ops_response = ops.ListOperationsResponse()
+        protobuf.set(list_ops_response, 'operations', [
+            {'name': 'foo'},
+            ops.Operation(name='bar'),
+        ])
+        assert len(list_ops_response.operations) == 2
+        for op in list_ops_response.operations:
+            assert isinstance(op, ops.Operation)
+        assert list_ops_response.operations[0].name == 'foo'
+        assert list_ops_response.operations[1].name == 'bar'
+
+    def test_set_list_clear_existing(self):
+        list_ops_response = ops.ListOperationsResponse(
+            operations=[{'name': 'baz'}],
+        )
+        protobuf.set(list_ops_response, 'operations', [
+            {'name': 'foo'},
+            ops.Operation(name='bar'),
+        ])
+        assert len(list_ops_response.operations) == 2
+        for op in list_ops_response.operations:
+            assert isinstance(op, ops.Operation)
+        assert list_ops_response.operations[0].name == 'foo'
+        assert list_ops_response.operations[1].name == 'bar'
+
+    def test_set_dict_nested_with_message(self):
+        rule = http_pb2.HttpRule()
+        pattern = http_pb2.CustomHttpPattern(kind='foo', path='bar')
+        protobuf.set(rule, 'custom', pattern)
+        assert rule.custom.kind == 'foo'
+        assert rule.custom.path == 'bar'
+
+    def test_set_dict_nested_with_dict(self):
+        rule = http_pb2.HttpRule()
+        pattern = {'kind': 'foo', 'path': 'bar'}
+        protobuf.set(rule, 'custom', pattern)
+        assert rule.custom.kind == 'foo'
+        assert rule.custom.path == 'bar'
 
 
 class SetDefaultTests(unittest.TestCase):
