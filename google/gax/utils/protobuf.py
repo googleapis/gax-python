@@ -85,8 +85,8 @@ def get(pb_or_dict, key, default=_SENTINEL):
         raise KeyError(key)
 
     # If a subkey exists, call this method recursively against the answer.
-    if subkey:
-        return get(answer, subkey)
+    if subkey and answer is not default:
+        return get(answer, subkey, default=default)
 
     # Return the value.
     return answer

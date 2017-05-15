@@ -50,6 +50,10 @@ class GetTests(unittest.TestCase):
     def test_get_dict_nested(self):
         assert protobuf.get({'foo': {'bar': 'baz'}}, 'foo.bar') == 'baz'
 
+    def test_get_dict_nested_default(self):
+        assert protobuf.get({}, 'foo.baz', default='bacon') == 'bacon'
+        assert protobuf.get({'foo': {}}, 'foo.baz', default='bacon') == 'bacon'
+
     def test_get_pb2_sentinel(self):
         op = ops.Operation()
         with pytest.raises(KeyError):
