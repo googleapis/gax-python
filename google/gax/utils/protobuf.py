@@ -46,9 +46,8 @@ def get(pb_or_dict, key, default=_SENTINEL):
     raise KeyError.
 
     Args:
-        pb_or_dict: An object which may be either:
-            - A subclass of :class:`google.protobuf.message.Message`
-            - A subclass of :class:`collections.Mapping` (e.g. dict)
+        pb_or_dict (Union[~google.protobuf.message.Message, Mapping]): the
+            object.
         key (str): The key to retrieve from the object in question.
         default (Any): If the key is not present on the object, and a default
             is set, returns that default instead. A type-appropriate falsy
@@ -96,15 +95,18 @@ def set(pb_or_dict, key, value):
     """Set the given key on the object.
 
     Args:
-        pb_or_dict: An object which may be either:
-            - A subclass of :class:`google.protobuf.message.Message`
-            - A subclass of :class:`collections.MutableMapping` (e.g. dict)
+        pb_or_dict (Union[~google.protobuf.message.Message, Mapping]): the
+            object.
         key (str): The key on the object in question.
         value (Any): The value to set.
 
     Raises:
         TypeError: If pb_or_dict is not a Message or Mapping.
     """
+    # pylint: disable=redefined-builtin,too-many-branches
+    # redefined-builtin: We want 'set' to be part of the public interface.
+    # too-many-branches: This method is inherently complex.
+
     # Sanity check: Is our target object valid?
     if not isinstance(pb_or_dict, (collections.MutableMapping, Message)):
         raise TypeError('Tried to set a key %s on an invalid object; '
@@ -118,7 +120,8 @@ def set(pb_or_dict, key, value):
     if subkey is not None:
         if isinstance(pb_or_dict, collections.MutableMapping):
             pb_or_dict.setdefault(key, {})
-        return set(get(pb_or_dict, key), subkey, value)
+        set(get(pb_or_dict, key), subkey, value)
+        return
 
     # Attempt to set the value on the types of objects we know how to deal
     # with.
@@ -127,23 +130,23 @@ def set(pb_or_dict, key, value):
     elif isinstance(value, (collections.MutableSequence, tuple)):
         # Clear the existing repeated protobuf message of any elements
         # currently inside it.
-        while len(getattr(pb_or_dict, key)) > 0:
+        while getattr(pb_or_dict, key):
             getattr(pb_or_dict, key).pop()
 
         # Write our new elements to the repeated field.
-        for v in value:
-            if isinstance(v, collections.Mapping):
-                getattr(pb_or_dict, key).add(**v)
+        for item in value:
+            if isinstance(item, collections.Mapping):
+                getattr(pb_or_dict, key).add(**item)
             else:
-                getattr(pb_or_dict, key).extend([v])
+                getattr(pb_or_dict, key).extend([item])
     elif isinstance(value, collections.Mapping):
         # Assign the dictionary values to the protobuf message.
-        for k, v in value.items():
-            set(getattr(pb_or_dict, key), k, v)
+        for item_key, item_value in value.items():
+            set(getattr(pb_or_dict, key), item_key, item_value)
     elif isinstance(value, Message):
         # Assign the protobuf message values to the protobuf message.
-        for k, v in value.ListFields():
-            set(getattr(pb_or_dict, key), k.name, v)
+        for item_key, item_value in value.ListFields():
+            set(getattr(pb_or_dict, key), item_key.name, item_value)
     else:
         setattr(pb_or_dict, key, value)
 
@@ -157,9 +160,8 @@ def setdefault(pb_or_dict, key, value):
     and dictionaries.
 
     Args:
-        pb_or_dict: An object which may be either:
-            - A subclass of :class:`google.protobuf.message.Message`
-            - A subclass of :class:`collections.MutableMapping` (e.g. dict)
+        pb_or_dict (Union[~google.protobuf.message.Message, Mapping]): the
+            object.
         key (str): The key on the object in question.
         value (Any): The value to set.
 
@@ -179,7 +181,7 @@ def _resolve_subkeys(key, separator='.'):
         separator (str): The namespace separator. Defaults to `.`.
 
     Returns:
-        tuple[str, str]: The key and subkey(s).
+        Tuple[str, str]: The key and subkey(s).
     """
     subkey = None
     if separator in key:

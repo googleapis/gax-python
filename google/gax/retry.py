@@ -126,7 +126,6 @@ def retryable(a_func, retry_options, **kwargs):
                         'Exception occurred in retry method that was not'
                         ' classified as transient', exception)
 
-                # pylint: disable=redefined-variable-type
                 exc = errors.RetryError(
                     'Retry total timeout exceeded with exception', exception)
 

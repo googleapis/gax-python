@@ -55,17 +55,17 @@ class GetTests(unittest.TestCase):
         assert protobuf.get({'foo': {}}, 'foo.baz', default='bacon') == 'bacon'
 
     def test_get_pb2_sentinel(self):
-        op = ops.Operation()
+        operation = ops.Operation()
         with pytest.raises(KeyError):
-            assert protobuf.get(op, 'foo')
+            assert protobuf.get(operation, 'foo')
 
     def test_get_pb2_present(self):
-        op = ops.Operation(name='foo')
-        assert protobuf.get(op, 'name') == 'foo'
+        operation = ops.Operation(name='foo')
+        assert protobuf.get(operation, 'name') == 'foo'
 
     def test_get_pb2_default(self):
-        op = ops.Operation()
-        assert protobuf.get(op, 'foo', default='bar') == 'bar'
+        operation = ops.Operation()
+        assert protobuf.get(operation, 'foo', default='bar') == 'bar'
 
     def test_invalid_object(self):
         obj = object()
@@ -75,19 +75,19 @@ class GetTests(unittest.TestCase):
 
 class SetTests(unittest.TestCase):
     def test_set_dict(self):
-        d = {}
-        protobuf.set(d, 'foo', 'bar')
-        assert d == {'foo': 'bar'}
+        mapping = {}
+        protobuf.set(mapping, 'foo', 'bar')
+        assert mapping == {'foo': 'bar'}
 
     def test_set_pb2(self):
-        op = ops.Operation()
-        protobuf.set(op, 'name', 'foo')
-        assert op.name == 'foo'
+        operation = ops.Operation()
+        protobuf.set(operation, 'name', 'foo')
+        assert operation.name == 'foo'
 
     def test_set_nested(self):
-        d = {}
-        protobuf.set(d, 'foo.bar', 'baz')
-        assert d == {'foo': {'bar': 'baz'}}
+        mapping = {}
+        protobuf.set(mapping, 'foo.bar', 'baz')
+        assert mapping == {'foo': {'bar': 'baz'}}
 
     def test_invalid_object(self):
         obj = object()
@@ -101,8 +101,8 @@ class SetTests(unittest.TestCase):
             ops.Operation(name='bar'),
         ])
         assert len(list_ops_response.operations) == 2
-        for op in list_ops_response.operations:
-            assert isinstance(op, ops.Operation)
+        for operation in list_ops_response.operations:
+            assert isinstance(operation, ops.Operation)
         assert list_ops_response.operations[0].name == 'foo'
         assert list_ops_response.operations[1].name == 'bar'
 
@@ -115,8 +115,8 @@ class SetTests(unittest.TestCase):
             ops.Operation(name='bar'),
         ])
         assert len(list_ops_response.operations) == 2
-        for op in list_ops_response.operations:
-            assert isinstance(op, ops.Operation)
+        for operation in list_ops_response.operations:
+            assert isinstance(operation, ops.Operation)
         assert list_ops_response.operations[0].name == 'foo'
         assert list_ops_response.operations[1].name == 'bar'
 
@@ -137,26 +137,26 @@ class SetTests(unittest.TestCase):
 
 class SetDefaultTests(unittest.TestCase):
     def test_dict_unset(self):
-        d = {}
-        protobuf.setdefault(d, 'foo', 'bar')
-        assert d == {'foo': 'bar'}
+        mapping = {}
+        protobuf.setdefault(mapping, 'foo', 'bar')
+        assert mapping == {'foo': 'bar'}
 
     def test_dict_falsy(self):
-        d = {'foo': None}
-        protobuf.setdefault(d, 'foo', 'bar')
-        assert d == {'foo': 'bar'}
+        mapping = {'foo': None}
+        protobuf.setdefault(mapping, 'foo', 'bar')
+        assert mapping == {'foo': 'bar'}
 
     def test_dict_truthy(self):
-        d = {'foo': 'bar'}
-        protobuf.setdefault(d, 'foo', 'baz')
-        assert d == {'foo': 'bar'}
+        mapping = {'foo': 'bar'}
+        protobuf.setdefault(mapping, 'foo', 'baz')
+        assert mapping == {'foo': 'bar'}
 
     def test_pb2_falsy(self):
-        op = ops.Operation()
-        protobuf.setdefault(op, 'name', 'foo')
-        assert op.name == 'foo'
+        operation = ops.Operation()
+        protobuf.setdefault(operation, 'name', 'foo')
+        assert operation.name == 'foo'
 
     def test_pb2_truthy(self):
-        op = ops.Operation(name='bar')
-        protobuf.setdefault(op, 'name', 'foo')
-        assert op.name == 'bar'
+        operation = ops.Operation(name='bar')
+        protobuf.setdefault(operation, 'name', 'foo')
+        assert operation.name == 'bar'

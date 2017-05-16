@@ -147,7 +147,7 @@ class Task(object):
 
         The task's func will be called with the bundling requests func
         """
-        if len(self._in_deque) == 0:
+        if not self._in_deque:
             return
         req = self._bundling_request
         del getattr(req, self.bundled_field)[:]
