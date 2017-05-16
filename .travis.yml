@@ -2,26 +2,26 @@ language: python
 sudo: false
 matrix:
   include:
+  - python: 3.6
+    env: NOX_SESSION=lint
+  - python: 3.6
+    env: NOX_SESSION=docs
+  - python: 3.6
+    env: NOX_SESSION=cover
   - python: 2.7
-    env: TOXENV=py27
+    env: NOX_SESSION="unit_tests(python='python2.7')"
   - python: 3.4
-    env: TOXENV=py34
+    env: NOX_SESSION="unit_tests(python='python3.4')"
   - python: 3.5
-    env: TOXENV=py35
+    env: NOX_SESSION="unit_tests(python='python3.5')"
   # Disabled until gRPC supports PyPy.
   # - python: pypy
-  #   env: TOXENV=pypy
-  - python: 3.5
-    env: TOXENV=lint
-  - python: 3.6
-    env: TOXENV=docs
-  - python: 3.6
-    env: TOXENV=cover
+  #   env: NOX_SESSION=unit_tests(python='pypy')
 cache:
   directories:
   - ${HOME}/.cache
 install:
-- pip install --upgrade tox
-script: tox
+- pip install --upgrade nox-automation
+script: nox -s $NOX_SESSION
 after_success:
-- test $TOXENV = "cover" && codecov
+- test $NOX_SESSION = "cover" && codecov

@@ -1,1 +1,2 @@
+sphinx
 sphinx-docstring-typing
