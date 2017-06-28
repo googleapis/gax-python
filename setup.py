@@ -36,7 +36,6 @@ from setuptools import setup
 
 
 DEPENDENCIES = [
-    'dill >= 0.2.5, < 0.3dev',
     'future >= 0.16.0, < 0.17dev',
     'googleapis-common-protos >= 1.5.2, < 2.0dev',
     'grpcio >=1.0.2, < 2.0dev',
