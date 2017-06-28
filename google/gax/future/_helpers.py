@@ -32,8 +32,6 @@
 import logging
 import threading
 
-import grpc
-
 from google import gax
 from google.gax import retry
 
@@ -82,7 +80,7 @@ def safe_invoke_callback(callback, *args, **kwargs):
         _LOGGER.exception('Error while executing Future callback.')
 
 
-def blocking_poll(poll_once_func, timeout=None):
+def blocking_poll(poll_once_func, retry_codes, timeout=None):
     """A pattern for repeatedly polling a function.
 
     This pattern uses gax's retry and backoff functionality to continuously
@@ -93,6 +91,8 @@ def blocking_poll(poll_once_func, timeout=None):
 
     Args:
         poll_once_func (Callable): The function to invoke.
+        retry_codes (Sequence[str]): a list of Google API error codes that
+            signal a retry should happen.
         timeout (int): The maximum number of seconds to poll.
 
     Returns:
@@ -123,8 +123,7 @@ def blocking_poll(poll_once_func, timeout=None):
 
     # Set the retry to retry if poll_once_func raises the
     # a deadline exceeded error, according to the given backoff settings.
-    retry_options = gax.RetryOptions(
-        [grpc.StatusCode.DEADLINE_EXCEEDED], backoff_settings)
+    retry_options = gax.RetryOptions(retry_codes, backoff_settings)
     retryable_poll = retry.retryable(poll_once_func, retry_options)
 
     # Start polling, and return the final result from the poll_once_func.

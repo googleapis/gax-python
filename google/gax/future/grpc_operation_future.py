@@ -29,12 +29,25 @@
 
 """a gRPC-based future for long-running operations."""
 
+import concurrent.futures
 import threading
+
+import grpc
 
 from google.gax import errors
 from google.gax.future import _helpers
 from google.gax.future import base
 from google.rpc import code_pb2
+
+
+class _RetryPoll(
+        errors.GaxError, grpc.RpcError, concurrent.futures.TimeoutError):
+    def __init__(self):
+        super(_RetryPoll, self).__init__('Operation not complete')
+
+    def code(self):  # pylint: disable=no-self-use
+        """RPC status code, inherited from :class:`grpc.RpcError`."""
+        return grpc.StatusCode.DEADLINE_EXCEEDED
 
 
 class OperationFuture(base.PollingFuture):
@@ -161,7 +174,11 @@ class OperationFuture(base.PollingFuture):
         complete.
 
         Raises:
-            TimeoutError: if the operation is not done.
+            _RetryPoll: if the operation is not done.
         """
         if not self.done():
-            raise errors.TimeoutError()
+            raise _RetryPoll()
+
+    @property
+    def _poll_retry_codes(self):
+        return [grpc.StatusCode.DEADLINE_EXCEEDED]

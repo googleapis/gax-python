@@ -27,17 +27,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import grpc
 import mock
-
 import pytest
 
-from google.gax import errors
 from google.gax.future import base
 
 
 class PollingFutureImpl(base.PollingFuture):
-    def _poll_once(self, timeout):
+    def _poll_once(self, timeout):  # pragma: NO COVER
         pass
+
+    @property
+    def _poll_retry_codes(self):  # pragma: NO COVER
+        return []
 
     def cancel(self):
         return True
@@ -96,6 +99,11 @@ def test_invoke_callback_exception():
     callback_mock.assert_called_once_with(future)
 
 
+class RetryPoll(grpc.RpcError):
+    def code(self):
+        return grpc.StatusCode.DEADLINE_EXCEEDED
+
+
 class PollingFutureImplWithPoll(PollingFutureImpl):
     def __init__(self):
         super(PollingFutureImplWithPoll, self).__init__()
@@ -104,8 +112,12 @@ class PollingFutureImplWithPoll(PollingFutureImpl):
     def _poll_once(self, timeout):
         self.poll_count += 1
         if self.poll_count < 3:
-            raise errors.TimeoutError()
+            raise RetryPoll()
         self.set_result(42)
+
+    @property
+    def _poll_retry_codes(self):
+        return [grpc.StatusCode.DEADLINE_EXCEEDED]
 
 
 @mock.patch('time.sleep')

@@ -31,10 +31,6 @@
 
 from __future__ import absolute_import
 
-import concurrent.futures
-
-import grpc
-
 from google.gax import config
 
 
@@ -81,17 +77,3 @@ def create_error(msg, cause=None):
 class RetryError(GaxError):
     """Indicates an error during automatic GAX retrying."""
     pass
-
-
-class TimeoutError(GaxError, grpc.RpcError, concurrent.futures.TimeoutError):
-    """Error raised by :class:`gax.future.Future` instances when timeout
-    occur."""
-    # pylint: disable=redefined-builtin
-    # We are not raising a builtin TimeoutError anywhere in this code.
-
-    def __init__(self):
-        super(TimeoutError, self).__init__('Deadline exceeded')
-
-    def code(self):  # pylint: disable=no-self-use
-        """Return the rpc status code (inherited from grpc.RpcError)."""
-        return grpc.StatusCode.DEADLINE_EXCEEDED

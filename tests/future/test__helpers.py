@@ -27,10 +27,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import grpc
 import mock
 import pytest
 
-from google.gax import errors
 from google.gax.future import _helpers
 from google.protobuf import any_pb2
 
@@ -58,12 +58,18 @@ def test_start_deamon_thread(mock_thread):
     assert thread.daemon is True
 
 
+class DeadlineExceeded(grpc.RpcError):
+    def code(self):
+        return grpc.StatusCode.DEADLINE_EXCEEDED
+
+
 @mock.patch('time.sleep')
 def test_blocking_poll(unused_sleep):
-    error = errors.TimeoutError()
+    error = DeadlineExceeded()
     target = mock.Mock(side_effect=[error, error, 42])
 
-    result = _helpers.blocking_poll(target, timeout=1)
+    result = _helpers.blocking_poll(
+        target, [grpc.StatusCode.DEADLINE_EXCEEDED], timeout=1)
 
     assert result == 42
     assert target.call_count == 3

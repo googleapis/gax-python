@@ -103,6 +103,29 @@ class PollingFuture(Future):
 
     @abc.abstractmethod
     def _poll_once(self, timeout):  # pragma: NO COVER
+        """Poll for completion once.
+
+        Subclasses must implement this. It should check if the task is complete
+        and call :meth:`set_result` or :meth:`set_exception`. If the task
+        isn't complete, this should raise a
+        :class:`google.gax.errors.GaxError` with a code that can be retried.
+
+        Args:
+            timeout (float): unused.
+
+        Raises:
+            google.gax.errors.GaxError: if the operation should be retried.
+
+        .. note: Due to the retry implementation, the exception raised here
+            to indicate retry must also be a `grpc.RpcError`.
+        """
+        # pylint: disable=missing-raises-doc
+        # pylint doesn't recognize this as abstract.
+        raise NotImplementedError()
+
+    @abc.abstractproperty
+    def _poll_retry_codes(self):  # pragma: NO COVER
+        """Sequence[str]: Which API status codes can be retried."""
         raise NotImplementedError()
 
     def _blocking_poll(self, timeout=None):
@@ -115,7 +138,8 @@ class PollingFuture(Future):
         if self._result_set:
             return
 
-        _helpers.blocking_poll(self._poll_once, timeout=timeout)
+        _helpers.blocking_poll(
+            self._poll_once, self._poll_retry_codes, timeout=timeout)
 
     def result(self, timeout=None):
         """Get the result of the operation, blocking if necessary.
@@ -128,9 +152,8 @@ class PollingFuture(Future):
             google.protobuf.Message: The Operation's result.
 
         Raises:
-            google.gax.GaxError: If the operation errors.
-            google.gax.TimeoutError: If the timeout is reached before the
-                operation completes.
+            google.gax.GaxError: If the operation errors or if the timeout is
+                reached before the operation completes.
         """
         self._blocking_poll()
 
