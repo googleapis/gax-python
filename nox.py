@@ -81,6 +81,7 @@ def cover(session):
     session.interpreter = 'python3.6'
     session.install('-r', 'test-requirements.txt')
     session.install('.')
+    session.run('pip', 'freeze')
     session.run(
         'py.test', '--cov=google.gax', '--cov=tests', '--cov-report=', 'tests')
     session.run(
