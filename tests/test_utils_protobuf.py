@@ -33,7 +33,7 @@ import pytest
 
 from google.api import http_pb2
 from google.gax.utils import protobuf
-from google.longrunning import operations_proto_pb2 as ops
+from google.longrunning import operations_pb2 as ops
 
 
 class GetTests(unittest.TestCase):
