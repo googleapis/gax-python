@@ -141,6 +141,49 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertEqual(my_callable(None, CallOptions(key='updated')),
                          'updated')
 
+    def test_call_merge_options_metadata(self):
+        settings_kwargs = {
+            'key': 'value',
+            'metadata': [('key1', 'val1'), ('key2', 'val2')]
+        }
+
+        settings = _CallSettings(kwargs=settings_kwargs)
+        my_callable = api_callable.create_api_call(
+            lambda _req, _timeout, **kwargs: kwargs, settings)
+
+        # Merge empty options, settings.kwargs['metadata'] remain unchanged
+        expected_kwargs = settings_kwargs
+        self.assertEqual(my_callable(None), expected_kwargs)
+
+        # Override an existing key in settings.kwargs['metadata']
+        expected_kwargs = {
+            'key': 'value',
+            'metadata': [('key1', '_val1'), ('key2', 'val2')]
+        }
+        self.assertEqual(
+            my_callable(None, CallOptions(metadata=[('key1', '_val1')])),
+            expected_kwargs)
+
+        # Add a new key in settings.kwargs['metadata']
+        expected_kwargs = {
+            'key': 'value',
+            'metadata': [('key3', 'val3'), ('key1', 'val1'), ('key2', 'val2')]
+        }
+        self.assertEqual(
+            my_callable(None, CallOptions(metadata=[('key3', 'val3')])),
+            expected_kwargs)
+
+        # Do all: add a new key and override an existing one in
+        # settings.kwargs['metadata']
+        expected_kwargs = {
+            'key': 'value',
+            'metadata': [('key3', 'val3'), ('key2', '_val2'), ('key1', 'val1')]
+        }
+        self.assertEqual(
+            my_callable(None, CallOptions(
+                metadata=[('key3', 'val3'), ('key2', '_val2')])),
+            expected_kwargs)
+
     @mock.patch('time.time')
     @mock.patch('google.gax.config.exc_to_code')
     def test_retry(self, mock_exc_to_code, mock_time):

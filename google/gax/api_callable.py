@@ -382,6 +382,28 @@ def _catch_errors(a_func, to_catch):
     return inner
 
 
+def _merge_options_metadata(options, settings):
+    """Merge metadata list (add all missing tuples)"""
+    if not options:
+        return options
+    kwargs = options.kwargs
+    if kwargs == gax.OPTION_INHERIT or 'metadata' not in kwargs:
+        return options
+
+    kwarg_meta_dict = {}
+    merged_kwargs = options.kwargs.copy()
+    for kwarg_meta in merged_kwargs['metadata']:
+        kwarg_meta_dict[kwarg_meta[0].lower()] = kwarg_meta
+    for kwarg_meta in settings.kwargs['metadata']:
+        if kwarg_meta[0].lower() not in kwarg_meta_dict:
+            merged_kwargs['metadata'].append(kwarg_meta)
+    return gax.CallOptions(
+        timeout=options.timeout, retry=options.retry,
+        page_token=options.page_token,
+        is_bundling=options.is_bundling,
+        **merged_kwargs)
+
+
 def create_api_call(func, settings):
     """Converts an rpc call into an API call governed by the settings.
 
@@ -417,7 +439,9 @@ def create_api_call(func, settings):
 
     def inner(request, options=None):
         """Invoke with the actual settings."""
-        this_settings = settings.merge(options)
+        this_options = _merge_options_metadata(options, settings)
+        this_settings = settings.merge(this_options)
+
         if this_settings.retry and this_settings.retry.retry_codes:
             api_call = gax.retry.retryable(
                 func, this_settings.retry, **this_settings.kwargs)
