@@ -438,6 +438,7 @@ class TestCreateApiCallable(unittest2.TestCase):
         self.assertRaises(AnotherException, other_error_callable, None)
 
     def test_wrap_value_error(self):
+        from google.gax.errors import InvalidArgumentError
 
         invalid_attribute_exc = grpc.RpcError()
         invalid_attribute_exc.code = lambda: grpc.StatusCode.INVALID_ARGUMENT
@@ -447,4 +448,10 @@ class TestCreateApiCallable(unittest2.TestCase):
 
         value_error_callable = api_callable.create_api_call(
             value_error_func, _CallSettings())
-        self.assertRaises(ValueError, value_error_callable, None)
+
+        with self.assertRaises(ValueError) as exc_info:
+            value_error_callable(None)
+
+        self.assertIsInstance(exc_info.exception, InvalidArgumentError)
+        self.assertEqual(exc_info.exception.args, (u'RPC failed',))
+        self.assertIs(exc_info.exception.cause, invalid_attribute_exc)

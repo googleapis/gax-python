@@ -52,14 +52,12 @@ class GaxError(Exception):
         if not self.cause:
             return msg
 
-        return 'GaxError({}, caused by {})'.format(msg, self.cause)
+        return '{}({}, caused by {})'.format(
+            self.__class__.__name__, msg, self.cause)
 
 
-def create_error(msg, cause=None):
-    """Creates an error.
-
-    Uses a Python built-in exception if one is available, and a
-    GaxError otherwise.
+class InvalidArgumentError(ValueError, GaxError):
+    """GAX exception class for ``INVALID_ARGUMENT`` errors.
 
     Attributes:
       msg (string): describes the error that occurred.
@@ -67,11 +65,29 @@ def create_error(msg, cause=None):
         layer of the RPC stack (for example, gRPC) that caused this
         exception, or None if this exception originated in GAX.
     """
-    if config.NAME_STATUS_CODES.get(
-            config.exc_to_code(cause)) == 'INVALID_ARGUMENT':
-        return ValueError('{}: {}'.format(msg, cause))
+
+    def __init__(self, msg, cause=None):
+        GaxError.__init__(self, msg, cause=cause)
+
+
+def create_error(msg, cause=None):
+    """Creates a ``GaxError`` or subclass.
+
+    Attributes:
+        msg (string): describes the error that occurred.
+        cause (Exception, optional): the exception raised by a lower
+            layer of the RPC stack (for example, gRPC) that caused this
+            exception, or None if this exception originated in GAX.
+
+    Returns:
+        .GaxError: The exception that wraps ``cause``.
+    """
+    status_code = config.exc_to_code(cause)
+    status_name = config.NAME_STATUS_CODES.get(status_code)
+    if status_name == 'INVALID_ARGUMENT':
+        return InvalidArgumentError(msg, cause=cause)
     else:
-        return GaxError(msg, cause)
+        return GaxError(msg, cause=cause)
 
 
 class RetryError(GaxError):
