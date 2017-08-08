@@ -51,7 +51,7 @@ with io.open('README.rst', 'r') as readme:
 
 setup(
     name='google-gax',
-    version='0.15.13',
+    version='0.15.14',
     description='Google API Extensions',
     long_description=long_description,
     author='Google API Authors',
