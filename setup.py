@@ -39,7 +39,7 @@ DEPENDENCIES = [
     'dill >= 0.2.5, < 0.3dev',
     'future >= 0.16.0, < 0.17dev',
     'googleapis-common-protos >= 1.5.2, < 2.0dev',
-    'grpcio >=1.0.2, < 2.0dev',
+    'grpcio >=1.0.2, < 1.6dev',
     'google-auth >= 1.0.0, <2.0dev',
     'ply == 3.8',
     'protobuf >= 3.0.0, < 4.0dev',
@@ -51,7 +51,7 @@ with io.open('README.rst', 'r') as readme:
 
 setup(
     name='google-gax',
-    version='0.15.14',
+    version='0.15.15',
     description='Google API Extensions',
     long_description=long_description,
     author='Google API Authors',
