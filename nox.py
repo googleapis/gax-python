@@ -44,7 +44,7 @@ def lint(session):
         'flake8',
         '--import-order-style=google',
         '--application-import-names=google,tests',
-        '--ignore=E501',
+        '--ignore=E501,I202',
         '--exclude=gapic,fixtures',
         'google', 'tests')
     session.run(
