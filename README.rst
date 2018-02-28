@@ -1,3 +1,11 @@
+DEPRECATED
+==========
+
+This project has been deprecated and will no longer be developed. It has
+been wholly replaced by `google-api-core`_.
+
+.. _`google-api-core`: https://pypi.org/project/google-api-core/
+
 Google API Extensions for Python
 ================================
 
